@@ -19,7 +19,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
       {/* Subdued Telemetry Footer */}
       <footer className="py-5 text-center text-xs text-[var(--muted)] border-t border-[var(--line-subtle)] bg-[var(--card)]/40 backdrop-blur-md z-10 flex items-center justify-center gap-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block shadow-[0_0_8px_#10B981]" />
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
         <span className="tracking-wide">Operations Command Centre &bull; High-Precision Operations Engine</span>
       </footer>
     </div>

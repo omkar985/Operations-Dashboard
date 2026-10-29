@@ -26,12 +26,12 @@
   --primary-soft: #E0F2FE;
   --primary-text: #FFFFFF;
   --primary-ink: #0284C7;
-  --primary-glow: rgba(2, 132, 199, 0.35);
+  --primary-glow: transparent;
 
   /* Radiant Cyan */
   --cyan: #06B6D4;
   --cyan-soft: #ECFEFF;
-  --cyan-glow: rgba(6, 182, 212, 0.35);
+  --cyan-glow: transparent;
 
   /* Typography */
   --ink: #0F172A;
@@ -71,8 +71,7 @@
     0 10px 24px -4px rgb(15 23 42 / 8%);
   --shadow-pop:
     0 20px 40px -8px rgb(15 23 42 / 16%);
-  --shadow-glow:
-    0 0 25px -5px rgba(2, 132, 199, 0.25);
+  --shadow-glow: none;
 
   /* Chart colours */
   --chart-positive: #10B981;
@@ -98,12 +97,12 @@
   --primary-soft: rgba(14, 165, 233, 0.16);
   --primary-text: #FFFFFF;
   --primary-ink: #38BDF8;
-  --primary-glow: rgba(14, 165, 233, 0.45);
+  --primary-glow: transparent;
 
   /* Electric Cyber Cyan */
   --cyan: #00F0FF;
   --cyan-soft: rgba(0, 240, 255, 0.16);
-  --cyan-glow: rgba(0, 240, 255, 0.45);
+  --cyan-glow: transparent;
 
   /* Crisp Light Typography */
   --ink: #F8FAFC;
@@ -143,8 +142,7 @@
     0 12px 32px -4px rgb(0 0 0 / 55%);
   --shadow-pop:
     0 24px 48px -12px rgb(0 0 0 / 75%);
-  --shadow-glow:
-    0 0 35px -5px rgba(0, 240, 255, 0.28);
+  --shadow-glow: none;
 
   /* Chart colours */
   --chart-positive: #34D399;
@@ -167,10 +165,10 @@
     --primary-soft: rgba(14, 165, 233, 0.16);
     --primary-text: #FFFFFF;
     --primary-ink: #38BDF8;
-    --primary-glow: rgba(14, 165, 233, 0.45);
+    --primary-glow: transparent;
     --cyan: #00F0FF;
     --cyan-soft: rgba(0, 240, 255, 0.16);
-    --cyan-glow: rgba(0, 240, 255, 0.45);
+    --cyan-glow: transparent;
     --ink: #F8FAFC;
     --muted: #94A3B8;
     --muted-strong: #CBD5E1;
@@ -191,7 +189,7 @@
     --overlay: rgb(0 0 0 / 75%);
     --shadow-card: 0 1px 3px rgb(0 0 0 / 40%), 0 12px 32px -4px rgb(0 0 0 / 55%);
     --shadow-pop: 0 24px 48px -12px rgb(0 0 0 / 75%);
-    --shadow-glow: 0 0 35px -5px rgba(0, 240, 255, 0.28);
+    --shadow-glow: none;
     --chart-positive: #34D399;
     --chart-negative: #FB7185;
     --chart-caution: #FBBF24;
@@ -391,7 +389,7 @@ a:hover {
 
 .panel-interactive:hover, .card-interactive:hover {
   border-color: var(--line-hover);
-  box-shadow: var(--shadow-glow), var(--shadow-card);
+  box-shadow: var(--shadow-card);
   transform: translateY(-1.5px);
 }
 
@@ -405,7 +403,7 @@ a:hover {
 }
 
 .glass-pop {
-  box-shadow: var(--shadow-pop), var(--shadow-glow);
+  box-shadow: var(--shadow-pop);
 }
 
 .panel-head {
@@ -441,16 +439,16 @@ a:hover {
 
 .rule { border: 0; border-top: 1px solid var(--line-subtle); margin: 0; }
 
-/* Glowing Emblem Badge */
+/* Clean Emblem Badge */
 .emblem-glow {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 18px;
-  background: linear-gradient(135deg, rgba(2, 132, 199, 0.2) 0%, rgba(0, 240, 255, 0.12) 100%);
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  box-shadow: 0 0 25px rgba(2, 132, 199, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 /* ==========================================================================
@@ -496,37 +494,24 @@ a:hover {
 }
 .btn svg { flex: none; }
 
-/* Primary Action Gradient Button */
+/* Primary Action Button */
 .btn-primary {
-  background: linear-gradient(135deg, #0284C7 0%, #0369A1 50%, #1D4ED8 100%);
-  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%);
+  border: 1px solid #0284C7;
   color: #FFFFFF;
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 50%, #2563EB 100%);
-  border-color: rgba(56, 189, 248, 0.8);
-  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  transform: translateY(-1.5px);
+  background: linear-gradient(135deg, #0369A1 0%, #075985 100%);
+  border-color: #0369A1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
 }
 
 .btn-primary:active:not(:disabled) {
   transform: translateY(0.5px);
-  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4);
-}
-
-/* Moving shimmer sheen on hover */
-.btn-primary::after {
-  content: "";
-  position: absolute;
-  top: 0; left: -100%; width: 50%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
-  transition: transform 0.6s var(--ease-out);
-  pointer-events: none;
-}
-.btn-primary:hover::after {
-  transform: translateX(350%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .btn-ghost {
@@ -553,12 +538,12 @@ a:hover {
   background: var(--error);
   color: #fff;
   border-color: var(--error);
-  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 .btn-danger-solid:hover:not(:disabled) {
   filter: brightness(1.08);
-  transform: translateY(-1.5px);
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
 }
 
 .btn-sm {
@@ -606,7 +591,7 @@ a:hover {
   outline: none;
   border-color: var(--primary);
   background: var(--card);
-  box-shadow: 0 0 0 3px var(--primary-glow), 0 0 18px -2px var(--cyan-glow);
+  box-shadow: 0 0 0 1px var(--primary);
 }
 
 .input[aria-invalid="true"] { border-color: var(--error); }
@@ -662,7 +647,7 @@ a:hover {
 .segmented > [aria-pressed="true"], .segmented > [aria-current="page"], .segmented > [aria-selected="true"] {
   background: var(--card);
   color: var(--primary-ink);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 12px var(--primary-glow);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 .segmented > button:hover:not([aria-pressed="true"]):not([aria-selected="true"]) {
   color: var(--ink);
@@ -692,7 +677,7 @@ a:hover {
   width: 6px; height: 6px; border-radius: 50%;
   background: currentColor;
   flex: none;
-  box-shadow: 0 0 6px currentColor;
+  box-shadow: none;
 }
 .badge-plain::before { display: none; }
 .badge-success { color: var(--success); background: var(--success-bg); border-color: var(--success-border, var(--success)); }
@@ -845,12 +830,12 @@ a:hover {
 .nav-link[aria-current="page"] {
   color: var(--primary-ink);
   background: var(--card);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 15px var(--primary-glow);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 .nav-rail {
   position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0;
   background: var(--primary);
-  box-shadow: 0 0 8px var(--primary);
+  box-shadow: none;
 }
 
 .topbar {

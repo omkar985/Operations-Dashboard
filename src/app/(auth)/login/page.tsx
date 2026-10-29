@@ -55,8 +55,8 @@ function LoginForm() {
 
       {/* Brand Header */}
       <div className="flex flex-col items-center text-center mb-8">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#0284C7]/20 via-[#00F0FF]/15 to-transparent border border-[#38BDF8]/40 shadow-[0_0_25px_rgba(2,132,199,0.35)] flex items-center justify-center mb-4 text-[#0284C7] dark:text-[#38BDF8]">
-          <Radio className="w-8 h-8 stroke-[2.2] animate-pulse" />
+        <div className="w-16 h-16 rounded-2xl bg-[var(--raised)] border border-[var(--line)] flex items-center justify-center mb-4 text-[#0284C7] dark:text-[#38BDF8]">
+          <Radio className="w-8 h-8 stroke-[2.2]" />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">
           Operations Command Centre
@@ -139,7 +139,7 @@ function LoginForm() {
 
         <button
           type="submit"
-          className="btn btn-primary w-full mt-2 font-semibold h-11 text-sm shadow-lg group"
+          className="btn btn-primary w-full mt-2 font-semibold h-11 text-sm group"
           disabled={isSubmitting}
         >
           <span>{isSubmitting ? "Authenticating..." : "Sign in to Dashboard"}</span>

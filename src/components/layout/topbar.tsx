@@ -84,14 +84,14 @@ export function Topbar({ freshness, onMenuClick }: TopbarProps) {
           <div
             className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border backdrop-blur-md transition-all ${
               !freshness.configured
-                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25 shadow-[0_0_10px_rgba(245,158,11,0.15)]"
+                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
                 : isRunning
-                ? "bg-sky-500/15 text-sky-600 dark:text-sky-300 border-sky-500/30 shadow-[0_0_14px_rgba(56,189,248,0.25)]"
+                ? "bg-sky-500/15 text-sky-600 dark:text-sky-300 border-sky-500/30"
                 : hasError
-                ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/25 shadow-[0_0_10px_rgba(239,68,68,0.15)]"
+                ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/25"
                 : isStale
-                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25 shadow-[0_0_10px_rgba(245,158,11,0.15)]"
-                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 shadow-[0_0_12px_rgba(16,185,129,0.2)]"
+                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
             }`}
           >
             <span
@@ -102,7 +102,7 @@ export function Topbar({ freshness, onMenuClick }: TopbarProps) {
                   ? "bg-red-500"
                   : isStale
                   ? "bg-amber-500"
-                  : "bg-emerald-500 shadow-[0_0_6px_#10B981]"
+                  : "bg-emerald-500"
               }`}
             />
 

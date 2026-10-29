@@ -88,8 +88,8 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
               className="flex items-center gap-3 text-inherit no-underline hover:no-underline group"
               onClick={onClose}
             >
-              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-[#0284C7]/20 via-[#00F0FF]/15 to-transparent border border-[#38BDF8]/40 shadow-[0_0_15px_rgba(2,132,199,0.35)] text-[#0284C7] dark:text-[#38BDF8] shrink-0 group-hover:shadow-[0_0_20px_rgba(56,189,248,0.5)] transition-all">
-                <Radio className="w-4.5 h-4.5 stroke-[2.2] animate-pulse" />
+              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[var(--raised)] border border-[var(--line)] text-[#0284C7] dark:text-[#38BDF8] shrink-0 transition-colors">
+                <Radio className="w-4.5 h-4.5 stroke-[2.2]" />
               </div>
               <div className="flex flex-col">
                 <span className="font-bold text-[14px] tracking-tight text-[var(--ink)] leading-none">
@@ -177,7 +177,7 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span
                     className={`inline-block w-1.5 h-1.5 rounded-full ${
-                      user.role === "ADMIN" ? "bg-[var(--primary)] shadow-[0_0_6px_var(--primary)]" : "bg-emerald-500 shadow-[0_0_6px_#10B981]"
+                      user.role === "ADMIN" ? "bg-[var(--primary)]" : "bg-emerald-500"
                     }`}
                   />
                   <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--muted)]">

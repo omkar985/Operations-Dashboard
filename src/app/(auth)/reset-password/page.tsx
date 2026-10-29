@@ -156,7 +156,7 @@ function ResetPasswordForm() {
 
           <button
             type="submit"
-            className="btn btn-primary w-full mt-2 font-semibold h-11 text-sm shadow-lg group"
+            className="btn btn-primary w-full mt-2 font-semibold h-11 text-sm group"
             disabled={isSubmitting || !token}
           >
             <span>{isSubmitting ? "Updating Password..." : "Update Password"}</span>

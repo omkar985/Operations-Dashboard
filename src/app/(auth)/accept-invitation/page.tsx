@@ -68,7 +68,7 @@ function AcceptInvitationForm() {
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#38BDF8] to-transparent opacity-80" />
 
       <div className="flex flex-col items-center text-center mb-7">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-emerald-400/10 to-transparent border border-emerald-500/35 shadow-[0_0_25px_rgba(16,185,129,0.3)] flex items-center justify-center mb-4 text-emerald-500">
+        <div className="w-16 h-16 rounded-2xl bg-[var(--raised)] border border-[var(--line)] flex items-center justify-center mb-4 text-emerald-500">
           <ShieldCheck className="w-8 h-8 stroke-[2.2]" />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">
@@ -162,7 +162,7 @@ function AcceptInvitationForm() {
 
         <button
           type="submit"
-          className="btn btn-primary w-full mt-2 font-semibold h-11 text-sm shadow-lg group"
+          className="btn btn-primary w-full mt-2 font-semibold h-11 text-sm group"
           disabled={isSubmitting || !token}
         >
           <span>{isSubmitting ? "Activating Account..." : "Accept Invitation & Sign In"}</span>
