@@ -29,17 +29,17 @@ async function main() {
     try {
       const result = await sendMail({
         to: testRecipient,
-        subject: "Operations Command Centre — SMTP Verification Test",
+        subject: "Operations Dashboard Headphone Zone — SMTP Verification Test",
         html: `
           <div style="font-family: sans-serif; padding: 24px; background: #f8fafc; color: #1e293b;">
             <div style="max-width: 500px; margin: 0 auto; background: #ffffff; padding: 24px; border-radius: 8px; border: 1px solid #e2e8f0;">
-              <h2 style="color: #1588C9; margin-top: 0;">Operations Command Centre</h2>
+              <h2 style="color: #1588C9; margin-top: 0;">Operations Dashboard Headphone Zone</h2>
               <p>This is a verification email to confirm that your SMTP email dispatch is operating normally.</p>
               <p style="font-size: 12px; color: #64748b;">Timestamp: ${new Date().toISOString()}</p>
             </div>
           </div>
         `,
-        text: `Operations Command Centre — SMTP verification confirmed at ${new Date().toISOString()}`,
+        text: `Operations Dashboard Headphone Zone — SMTP verification confirmed at ${new Date().toISOString()}`,
       });
 
       console.log(`✓ Test email delivered to ${testRecipient} (Message ID: ${result.messageId}).`);

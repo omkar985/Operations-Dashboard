@@ -25,6 +25,7 @@ export function DashboardShell({ user, freshness, children }: DashboardShellProp
 
       <div className="flex flex-col min-w-0 flex-1">
         <Topbar
+          user={user}
           freshness={freshness}
           onMenuClick={() => setSidebarOpen(true)}
         />

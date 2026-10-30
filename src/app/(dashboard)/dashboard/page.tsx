@@ -20,6 +20,8 @@ import { DonutChart } from "@/components/charts/donut-chart";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AttentionSection } from "@/components/dashboard/attention-section";
 
+import { LiveRefreshHeader } from "@/components/dashboard/live-refresh-header";
+
 interface DashboardPageProps {
   searchParams: Promise<{
     range?: string;
@@ -42,7 +44,7 @@ export default async function DashboardPage(props: DashboardPageProps) {
     return (
       <div className="page space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="page-title">Executive Overview</h1>
+          <h1 className="page-title dm-serif-display-regular">Operations Dashboard</h1>
         </div>
         <EmptyState
           icon={<Settings2 className="w-6 h-6 stroke-[1.5]" />}
@@ -71,7 +73,7 @@ export default async function DashboardPage(props: DashboardPageProps) {
     return (
       <div className="page space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="page-title">Executive Overview</h1>
+          <h1 className="page-title dm-serif-display-regular">Operations Dashboard</h1>
         </div>
         <EmptyState
           icon={<RefreshCw className="w-6 h-6 stroke-[1.5]" />}
@@ -121,28 +123,21 @@ export default async function DashboardPage(props: DashboardPageProps) {
 
   return (
     <div className="page space-y-6">
-      {/* Top Header & Range Controls */}
+      {/* Top Header Row: Brand Title & Live Telemetry Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="page-title">Executive Overview</h1>
-          <p className="text-xs text-[var(--muted)] mt-1">
-            Real-time operational instrument panel &bull; {dataset.records.length.toLocaleString()} total ledger records
+          <h1 className="page-title dm-serif-display-regular">Operations Dashboard</h1>
+          <p className="text-xs sm:text-sm text-[var(--muted)] mt-1">
+            {parsedRange.label} &bull; in progress &bull; {dataset.records.length.toLocaleString()} total operational records
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <DateRangeFilter currentRange={parsedRange} />
+        <LiveRefreshHeader exportUrl={exportUrl} />
+      </div>
 
-          <a
-            href={exportUrl}
-            className="btn btn-sm btn-ghost gap-1.5 text-xs text-[var(--muted-strong)] hover:text-[var(--ink)]"
-            title="Export filtered records to CSV"
-            download
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Export CSV</span>
-          </a>
-        </div>
+      {/* Filter Row */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <DateRangeFilter currentRange={parsedRange} />
       </div>
 
       {/* Sync Warnings Banner */}

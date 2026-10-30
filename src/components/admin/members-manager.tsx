@@ -127,7 +127,7 @@ export function MembersManager({ currentUser, initialUsers }: MembersManagerProp
           <div>
             <h2 className="panel-title">Active Team Roster</h2>
             <p className="panel-sub">
-              {users.length} members with authorized Command Centre access
+              {users.length} members with authorized Operations Dashboard access
             </p>
           </div>
 

@@ -1,84 +1,13 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   COMMAND CENTRE — Ultra-Modern Design System
+   OPERATIONS DASHBOARD HEADPHONE ZONE — Ultra-Modern Design System
    Inspired by high-performance Vercel SaaS dashboards (Gurus & Returns).
    Features radiant ambient glows, frosted glassmorphism, glowing micro-animations,
    and precision typography.
    ========================================================================== */
 
 :root,
-[data-theme="light"] {
-  color-scheme: light;
-
-  /* Surfaces & Canvas */
-  --canvas: #F8FAFC;
-  --sidebar: #F1F5F9;
-  --card: #FFFFFF;
-  --card-glass: rgba(255, 255, 255, 0.88);
-  --raised: #F8FAFC;
-  --surface-hover: #F1F5F9;
-
-  /* Primary Electric Command Blues */
-  --primary: #0284C7;
-  --primary-hover: #0369A1;
-  --primary-active: #075985;
-  --primary-soft: #E0F2FE;
-  --primary-text: #FFFFFF;
-  --primary-ink: #0284C7;
-  --primary-glow: transparent;
-
-  /* Radiant Cyan */
-  --cyan: #06B6D4;
-  --cyan-soft: #ECFEFF;
-  --cyan-glow: transparent;
-
-  /* Typography */
-  --ink: #0F172A;
-  --muted: #64748B;
-  --muted-strong: #334155;
-
-  /* Borders & Dividers */
-  --line: #E2E8F0;
-  --line-subtle: #F1F5F9;
-  --line-hover: #CBD5E1;
-
-  /* Vibrant Semantics */
-  --success: #10B981;
-  --success-bg: #ECFDF5;
-  --success-border: #A7F3D0;
-
-  --warning: #F59E0B;
-  --warning-bg: #FFFBEB;
-  --warning-border: #FDE68A;
-
-  --error: #EF4444;
-  --error-bg: #FEF2F2;
-  --error-border: #FECACA;
-
-  --info: #0284C7;
-  --info-bg: #F0F9FF;
-  --info-border: #BAE6FD;
-
-  --neutral: #64748B;
-  --neutral-bg: #F1F5F9;
-
-  --focus-ring: #0284C7;
-  --overlay: rgb(15 23 42 / 45%);
-
-  --shadow-card:
-    0 1px 3px rgb(15 23 42 / 6%),
-    0 10px 24px -4px rgb(15 23 42 / 8%);
-  --shadow-pop:
-    0 20px 40px -8px rgb(15 23 42 / 16%);
-  --shadow-glow: none;
-
-  /* Chart colours */
-  --chart-positive: #10B981;
-  --chart-negative: #EF4444;
-  --chart-caution: #F59E0B;
-}
-
 [data-theme="dark"] {
   color-scheme: dark;
 
@@ -150,50 +79,75 @@
   --chart-caution: #FBBF24;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="dark"]) {
-    color-scheme: dark;
-    --canvas: #060913;
-    --sidebar: #090D1A;
-    --card: #0D1527;
-    --card-glass: rgba(13, 21, 39, 0.82);
-    --raised: #131E35;
-    --surface-hover: #192744;
-    --primary: #0EA5E9;
-    --primary-hover: #38BDF8;
-    --primary-active: #0284C7;
-    --primary-soft: rgba(14, 165, 233, 0.16);
-    --primary-text: #FFFFFF;
-    --primary-ink: #38BDF8;
-    --primary-glow: transparent;
-    --cyan: #00F0FF;
-    --cyan-soft: rgba(0, 240, 255, 0.16);
-    --cyan-glow: transparent;
-    --ink: #F8FAFC;
-    --muted: #94A3B8;
-    --muted-strong: #CBD5E1;
-    --line: rgba(56, 189, 248, 0.18);
-    --line-subtle: rgba(255, 255, 255, 0.08);
-    --line-hover: rgba(56, 189, 248, 0.45);
-    --success: #34D399;
-    --success-bg: rgba(16, 185, 129, 0.18);
-    --warning: #FBBF24;
-    --warning-bg: rgba(245, 158, 11, 0.18);
-    --error: #FB7185;
-    --error-bg: rgba(239, 68, 68, 0.18);
-    --info: #38BDF8;
-    --info-bg: rgba(56, 189, 248, 0.18);
-    --neutral: #CBD5E1;
-    --neutral-bg: rgba(255, 255, 255, 0.08);
-    --focus-ring: #00F0FF;
-    --overlay: rgb(0 0 0 / 75%);
-    --shadow-card: 0 1px 3px rgb(0 0 0 / 40%), 0 12px 32px -4px rgb(0 0 0 / 55%);
-    --shadow-pop: 0 24px 48px -12px rgb(0 0 0 / 75%);
-    --shadow-glow: none;
-    --chart-positive: #34D399;
-    --chart-negative: #FB7185;
-    --chart-caution: #FBBF24;
-  }
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces & Canvas */
+  --canvas: #F8FAFC;
+  --sidebar: #F1F5F9;
+  --card: #FFFFFF;
+  --card-glass: rgba(255, 255, 255, 0.88);
+  --raised: #F8FAFC;
+  --surface-hover: #F1F5F9;
+
+  /* Primary Electric Command Blues */
+  --primary: #0284C7;
+  --primary-hover: #0369A1;
+  --primary-active: #075985;
+  --primary-soft: #E0F2FE;
+  --primary-text: #FFFFFF;
+  --primary-ink: #0284C7;
+  --primary-glow: transparent;
+
+  /* Radiant Cyan */
+  --cyan: #06B6D4;
+  --cyan-soft: #ECFEFF;
+  --cyan-glow: transparent;
+
+  /* Typography */
+  --ink: #0F172A;
+  --muted: #64748B;
+  --muted-strong: #334155;
+
+  /* Borders & Dividers */
+  --line: #E2E8F0;
+  --line-subtle: #F1F5F9;
+  --line-hover: #CBD5E1;
+
+  /* Vibrant Semantics */
+  --success: #10B981;
+  --success-bg: #ECFDF5;
+  --success-border: #A7F3D0;
+
+  --warning: #F59E0B;
+  --warning-bg: #FFFBEB;
+  --warning-border: #FDE68A;
+
+  --error: #EF4444;
+  --error-bg: #FEF2F2;
+  --error-border: #FECACA;
+
+  --info: #0284C7;
+  --info-bg: #F0F9FF;
+  --info-border: #BAE6FD;
+
+  --neutral: #64748B;
+  --neutral-bg: #F1F5F9;
+
+  --focus-ring: #0284C7;
+  --overlay: rgb(15 23 42 / 45%);
+
+  --shadow-card:
+    0 1px 3px rgb(15 23 42 / 6%),
+    0 10px 24px -4px rgb(15 23 42 / 8%);
+  --shadow-pop:
+    0 20px 40px -8px rgb(15 23 42 / 16%);
+  --shadow-glow: none;
+
+  /* Chart colours */
+  --chart-positive: #10B981;
+  --chart-negative: #EF4444;
+  --chart-caution: #F59E0B;
 }
 
 :root {
@@ -298,14 +252,17 @@ h1, h2, h3, h4 {
 
 p { margin: 0; }
 
-a {
+a:not([class]) {
   color: var(--primary-ink);
   text-decoration: none;
   transition: color var(--dur-fast) var(--ease-out);
 }
-a:hover {
+a:not([class]):hover {
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+a {
+  text-decoration: none;
 }
 
 :focus-visible {
@@ -321,6 +278,16 @@ a:hover {
 
 .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 .display { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.01em; }
+.dm-serif-display-regular {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-style: normal;
+}
+.dm-serif-display-regular-italic {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-style: italic;
+}
 .mono { font-family: var(--font-mono); font-size: 0.92em; }
 
 /* Custom Sleek Scrollbars */
@@ -351,7 +318,7 @@ a:hover {
 
 /* Light Mode Ambient Glow */
 .page-mesh::before {
-  opacity: 1;
+  opacity: 0;
   background:
     radial-gradient(900px 420px at 80% -5%, rgba(2, 132, 199, 0.12), transparent 70%),
     radial-gradient(750px 380px at 0% 10%, rgba(6, 182, 212, 0.10), transparent 70%),
@@ -360,9 +327,9 @@ a:hover {
   background-size: 100% 100%, 100% 100%, 100% 100%, 32px 32px;
 }
 
-/* Dark Mode Ambient Glow */
+/* Dark Mode Ambient Glow (Default) */
 .page-mesh::after {
-  opacity: 0;
+  opacity: 1;
   background:
     radial-gradient(1000px 480px at 80% -5%, rgba(14, 165, 233, 0.22), transparent 65%),
     radial-gradient(800px 400px at 5% 15%, rgba(0, 240, 255, 0.14), transparent 65%),
@@ -371,6 +338,8 @@ a:hover {
   background-size: 100% 100%, 100% 100%, 100% 100%, 32px 32px;
 }
 
+[data-theme="light"] .page-mesh::before { opacity: 1; }
+[data-theme="light"] .page-mesh::after { opacity: 0; }
 [data-theme="dark"] .page-mesh::before { opacity: 0; }
 [data-theme="dark"] .page-mesh::after { opacity: 1; }
 

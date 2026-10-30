@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, RefreshCw } from "lucide-react";
-import { ThemeSwitcher } from "@/components/ui/theme-switcher";
+import { RefreshCw, Settings, LogOut } from "lucide-react";
 import { HeadphoneZoneLogo } from "@/components/ui/headphone-zone-logo";
 import { useToast } from "@/components/providers/toast-provider";
 import type { Freshness } from "@/server/services/dataset-service";
+import type { SessionUser } from "@/lib/auth/session";
 
 interface TopbarProps {
+  user: SessionUser;
   freshness: Freshness;
-  onMenuClick: () => void;
+  onMenuClick?: () => void;
 }
 
 function formatAge(ageSeconds: number | null): string {
@@ -24,7 +26,7 @@ function formatAge(ageSeconds: number | null): string {
   return `${days}d ago`;
 }
 
-export function Topbar({ freshness, onMenuClick }: TopbarProps) {
+export function Topbar({ user, freshness }: TopbarProps) {
   const router = useRouter();
   const toast = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -64,33 +66,36 @@ export function Topbar({ freshness, onMenuClick }: TopbarProps) {
     }
   }
 
+  async function handleSignOut() {
+    try {
+      await fetch("/api/auth/logout", { credentials: "include" });
+      router.push("/login");
+      router.refresh();
+    } catch {
+      router.push("/login");
+    }
+  }
+
   const isRunning = freshness.lastRunStatus === "running" || isRefreshing;
   const isStale = freshness.stale;
   const hasError = freshness.lastError !== null;
+  const isAdmin = user.role === "ADMIN";
 
   return (
     <header className="topbar">
+      {/* Left: Headphone Zone Brand */}
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm btn-icon lg:hidden -ml-2 text-[var(--ink)]"
-          onClick={onMenuClick}
-          aria-label="Open navigation menu"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-
-        <div className="flex items-center gap-2 lg:hidden text-[var(--ink)] font-bold text-xs tracking-tight">
-          <div className="w-6 h-6 rounded-md bg-[var(--raised)] border border-[var(--line)] flex items-center justify-center text-[#1588C9] dark:text-[#38BDF8]">
-            <HeadphoneZoneLogo className="w-3.5 h-3.5" />
-          </div>
-          <span className="hidden sm:inline">Operations</span>
+        <div className="flex items-center gap-2.5">
+          <HeadphoneZoneLogo size={18} className="text-[#1588C9] dark:text-[#38BDF8] shrink-0" aria-hidden />
+          <span className="text-xs font-semibold tracking-wider uppercase text-[var(--muted-strong)] select-none">
+            Headphone Zone
+          </span>
         </div>
 
         {/* Live System Indicator */}
-        <div className="flex items-center gap-2">
+        <div className="hidden md:flex items-center gap-2 ml-2">
           <div
-            className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border backdrop-blur-md transition-all ${
+            className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-semibold border backdrop-blur-md transition-all ${
               !freshness.configured
                 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
                 : isRunning
@@ -103,7 +108,7 @@ export function Topbar({ freshness, onMenuClick }: TopbarProps) {
             }`}
           >
             <span
-              className={`w-2 h-2 rounded-full shrink-0 ${
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                 isRunning
                   ? "bg-sky-500 animate-ping"
                   : hasError
@@ -113,14 +118,13 @@ export function Topbar({ freshness, onMenuClick }: TopbarProps) {
                   : "bg-emerald-500"
               }`}
             />
-
             <span className="leading-none font-medium">
               {!freshness.configured
-                ? "Source Not Configured"
+                ? "Source Unconfigured"
                 : isRunning
-                ? "Syncing Source..."
+                ? "Syncing..."
                 : hasError
-                ? "Sync Warning"
+                ? "Sync Notice"
                 : isStale
                 ? `Stale (${formatAge(freshness.ageSeconds)})`
                 : `Synced ${formatAge(freshness.ageSeconds)}`}
@@ -129,25 +133,56 @@ export function Topbar({ freshness, onMenuClick }: TopbarProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2.5">
-        {/* Manual Sync Button */}
-        {freshness.configured && (
-          <button
-            type="button"
-            className="btn btn-sm btn-ghost gap-1.5 text-xs text-[var(--muted-strong)] hover:text-[var(--ink)]"
-            onClick={handleRefresh}
-            disabled={isRunning}
-            title="Pull latest records from Google Sheets"
+      {/* Right: User Account, Admin Settings, and Sign Out */}
+      <div className="flex items-center gap-2 sm:gap-2.5">
+        {/* User Card */}
+        <div
+          className="inline-flex items-center gap-2 sm:gap-2.5 h-9 px-3 rounded-xl bg-[var(--card)] border border-[var(--line)] shadow-xs select-none"
+          title={`Signed in: ${user.email} (${user.role})`}
+        >
+          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#0284C7] to-[#1D4ED8] text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+            {(user.name || user.email || "U").slice(0, 2).toUpperCase()}
+          </div>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xs sm:text-[13px] font-medium text-[var(--ink)] truncate max-w-[120px] sm:max-w-[200px] leading-none">
+              {user.email}
+            </span>
+            {isAdmin ? (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 leading-none">
+                Admin
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-[var(--raised)] text-[var(--muted-strong)] border border-[var(--line)] leading-none">
+                Team
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Admin Settings Button */}
+        {isAdmin && (
+          <Link
+            href="/admin/members"
+            className="inline-flex items-center justify-center gap-2 h-9 px-3 sm:px-3.5 rounded-xl border border-[var(--line)] bg-[var(--card)] text-[var(--ink)] hover:border-[var(--line-hover)] hover:bg-[var(--surface-hover)] shadow-xs text-xs sm:text-[13px] font-medium transition-all select-none cursor-pointer"
+            title="Open Admin Settings"
+            aria-label="Admin Settings"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRunning ? "spin" : ""}`} />
-            <span className="hidden sm:inline">Refresh Data</span>
-          </button>
+            <Settings className="w-4 h-4 shrink-0 text-[var(--muted-strong)]" />
+            <span className="hidden sm:inline leading-none font-medium">Admin Settings</span>
+          </Link>
         )}
 
-        <div className="h-4 w-[1px] bg-[var(--line-subtle)] hidden sm:block" />
-
-        {/* Theme Switcher */}
-        <ThemeSwitcher />
+        {/* Sign Out Button */}
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="inline-flex items-center justify-center gap-2 h-9 px-3 sm:px-3.5 rounded-xl border border-[var(--line)] bg-[var(--card)] text-[var(--muted-strong)] hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 shadow-xs text-xs sm:text-[13px] font-medium transition-all select-none cursor-pointer"
+          title="Sign out of Operations Dashboard"
+          aria-label="Sign out"
+        >
+          <LogOut className="w-4 h-4 shrink-0" />
+          <span className="hidden sm:inline leading-none font-medium">Sign Out</span>
+        </button>
       </div>
     </header>
   );

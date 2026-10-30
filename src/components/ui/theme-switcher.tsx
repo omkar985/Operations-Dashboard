@@ -18,7 +18,7 @@ export function ThemeSwitcher({ className = "" }: { className?: string }) {
         onClick={() => setTheme("light")}
         aria-pressed={theme === "light"}
         aria-label="Light mode"
-        title="Light mode (Command Centre Day)"
+        title="Light mode (Day)"
         className={`px-2 py-1 text-xs font-medium rounded flex items-center gap-1 transition-colors ${
           theme === "light"
             ? "bg-[var(--card)] text-[var(--primary-ink)] shadow-xs"
@@ -34,7 +34,7 @@ export function ThemeSwitcher({ className = "" }: { className?: string }) {
         onClick={() => setTheme("dark")}
         aria-pressed={theme === "dark"}
         aria-label="Dark mode"
-        title="Dark mode (Command Centre Night)"
+        title="Dark mode (Night)"
         className={`px-2 py-1 text-xs font-medium rounded flex items-center gap-1 transition-colors ${
           theme === "dark"
             ? "bg-[var(--card)] text-[var(--primary-ink)] shadow-xs"

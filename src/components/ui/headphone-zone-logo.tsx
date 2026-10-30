@@ -8,7 +8,7 @@ export interface HeadphoneZoneLogoProps extends React.SVGProps<SVGSVGElement> {
 
 /**
  * Official Headphone Zone monogram logo component.
- * Uses currentColor by default to adapt dynamically to Command Centre light/dark themes.
+ * Uses currentColor by default to adapt dynamically to Operations Dashboard light/dark themes.
  */
 export function HeadphoneZoneLogo({
   size,

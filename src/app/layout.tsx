@@ -4,16 +4,16 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Operations Dashboard | Command Centre",
-    template: "%s | Operations Dashboard",
+    default: "Operations Dashboard Headphone Zone",
+    template: "%s | Operations Dashboard Headphone Zone",
   },
-  description: "High-precision full-stack operations management and workflow telemetry platform.",
+  description: "Operations Dashboard — High-precision operational telemetry and workflow platform for Headphone Zone.",
   robots: { index: false, follow: false },
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "any" },
     ],
+    shortcut: "/favicon.svg",
     apple: "/apple-icon",
   },
 };
@@ -25,7 +25,7 @@ const themeScript = `
     var cookie = document.cookie.match(/(?:^|; )od-theme=([^;]*)/);
     var theme = stored || (cookie ? cookie[1] : null);
     if (!theme || theme === 'system') {
-      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      theme = 'dark';
     }
     document.documentElement.setAttribute('data-theme', theme);
   } catch(e) {}
@@ -38,8 +38,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>

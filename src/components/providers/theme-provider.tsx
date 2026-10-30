@@ -16,7 +16,7 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function getSystemTheme(): ResolvedTheme {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") return "dark";
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
@@ -27,12 +27,12 @@ function getInitialTheme(defaultTheme: Theme): Theme {
 }
 
 function resolveThemeValue(t: Theme): ResolvedTheme {
-  return t === "system" ? getSystemTheme() : t;
+  return t === "system" ? "dark" : t;
 }
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
+  defaultTheme = "dark",
 }: {
   children: React.ReactNode;
   defaultTheme?: Theme;

@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
       </div>
 
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">
+        <h1 className="dm-serif-display-regular text-2xl sm:text-3xl text-[var(--ink)] tracking-tight">
           Reset Password
         </h1>
         <p className="mt-1.5 text-sm text-[var(--muted)] leading-relaxed">

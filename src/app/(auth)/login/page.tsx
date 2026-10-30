@@ -59,10 +59,13 @@ function LoginForm() {
         <div className="w-16 h-16 rounded-2xl bg-[var(--raised)] border border-[var(--line)] flex items-center justify-center mb-4 text-[#1588C9] dark:text-[#38BDF8]">
           <HeadphoneZoneLogo className="w-9 h-9" />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">
-          Operations Command Centre
+        <h1 className="dm-serif-display-regular text-2xl sm:text-3xl text-[var(--ink)] tracking-tight">
+          Operations Dashboard
         </h1>
-        <p className="mt-1.5 text-sm text-[var(--muted)]">
+        <p className="mt-1 text-xs uppercase font-semibold tracking-widest text-[var(--muted)]">
+          Headphone Zone
+        </p>
+        <p className="mt-2 text-xs text-[var(--muted)]">
           Sign in to access real-time operational telemetry
         </p>
       </div>

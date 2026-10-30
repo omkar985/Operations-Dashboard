@@ -72,7 +72,7 @@ function AcceptInvitationForm() {
         <div className="w-16 h-16 rounded-2xl bg-[var(--raised)] border border-[var(--line)] flex items-center justify-center mb-4 text-[#1588C9] dark:text-[#38BDF8]">
           <HeadphoneZoneLogo className="w-9 h-9" />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">
+        <h1 className="dm-serif-display-regular text-2xl sm:text-3xl text-[var(--ink)] tracking-tight">
           Welcome to the Team
         </h1>
         <p className="mt-1.5 text-sm text-[var(--muted)]">

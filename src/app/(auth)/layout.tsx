@@ -22,7 +22,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <footer className="py-5 text-center text-xs text-[var(--muted)] border-t border-[var(--line-subtle)] bg-[var(--card)]/40 backdrop-blur-md z-10 flex items-center justify-center gap-2">
         <HeadphoneZoneLogo className="w-3.5 h-3.5 text-[#1588C9] dark:text-[#38BDF8]" />
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-        <span className="tracking-wide">Operations Command Centre &bull; Headphone Zone</span>
+        <span className="tracking-wide">Operations Dashboard &bull; Headphone Zone</span>
       </footer>
     </div>
   );
