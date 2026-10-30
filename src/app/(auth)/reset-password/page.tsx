@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Lock, ArrowRight, CheckCircle2, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { HeadphoneZoneLogo } from "@/components/ui/headphone-zone-logo";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -65,6 +66,12 @@ function ResetPasswordForm() {
     <div className="glass p-8 sm:p-10 shadow-2xl rounded-2xl border border-[var(--line)] relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
       {/* Radiant Top Luminous Highlight */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#38BDF8] to-transparent opacity-80" />
+
+      <div className="flex items-center justify-between mb-6">
+        <div className="w-8 h-8 rounded-lg bg-[var(--raised)] border border-[var(--line)] flex items-center justify-center text-[#1588C9] dark:text-[#38BDF8]">
+          <HeadphoneZoneLogo className="w-4.5 h-4.5" />
+        </div>
+      </div>
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">

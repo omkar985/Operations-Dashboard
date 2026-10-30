@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu, RefreshCw } from "lucide-react";
 import { ThemeSwitcher } from "@/components/ui/theme-switcher";
+import { HeadphoneZoneLogo } from "@/components/ui/headphone-zone-logo";
 import { useToast } from "@/components/providers/toast-provider";
 import type { Freshness } from "@/server/services/dataset-service";
 
@@ -78,6 +79,13 @@ export function Topbar({ freshness, onMenuClick }: TopbarProps) {
         >
           <Menu className="w-5 h-5" />
         </button>
+
+        <div className="flex items-center gap-2 lg:hidden text-[var(--ink)] font-bold text-xs tracking-tight">
+          <div className="w-6 h-6 rounded-md bg-[var(--raised)] border border-[var(--line)] flex items-center justify-center text-[#1588C9] dark:text-[#38BDF8]">
+            <HeadphoneZoneLogo className="w-3.5 h-3.5" />
+          </div>
+          <span className="hidden sm:inline">Operations</span>
+        </div>
 
         {/* Live System Indicator */}
         <div className="flex items-center gap-2">

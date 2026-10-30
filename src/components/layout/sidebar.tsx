@@ -14,8 +14,8 @@ import {
   ShieldCheck,
   LogOut,
   X,
-  Radio,
 } from "lucide-react";
+import { HeadphoneZoneLogo } from "@/components/ui/headphone-zone-logo";
 import type { SessionUser } from "@/lib/auth/session";
 
 interface SidebarProps {
@@ -88,8 +88,8 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
               className="flex items-center gap-3 text-inherit no-underline hover:no-underline group"
               onClick={onClose}
             >
-              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[var(--raised)] border border-[var(--line)] text-[#0284C7] dark:text-[#38BDF8] shrink-0 transition-colors">
-                <Radio className="w-4.5 h-4.5 stroke-[2.2]" />
+              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[var(--raised)] border border-[var(--line)] text-[#1588C9] dark:text-[#38BDF8] shrink-0 transition-colors">
+                <HeadphoneZoneLogo className="w-5 h-5" />
               </div>
               <div className="flex flex-col">
                 <span className="font-bold text-[14px] tracking-tight text-[var(--ink)] leading-none">

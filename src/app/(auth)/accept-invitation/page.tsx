@@ -2,7 +2,8 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { User, Lock, ArrowRight, AlertCircle, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import { User, Lock, ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { HeadphoneZoneLogo } from "@/components/ui/headphone-zone-logo";
 
 function AcceptInvitationForm() {
   const router = useRouter();
@@ -68,8 +69,8 @@ function AcceptInvitationForm() {
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#38BDF8] to-transparent opacity-80" />
 
       <div className="flex flex-col items-center text-center mb-7">
-        <div className="w-16 h-16 rounded-2xl bg-[var(--raised)] border border-[var(--line)] flex items-center justify-center mb-4 text-emerald-500">
-          <ShieldCheck className="w-8 h-8 stroke-[2.2]" />
+        <div className="w-16 h-16 rounded-2xl bg-[var(--raised)] border border-[var(--line)] flex items-center justify-center mb-4 text-[#1588C9] dark:text-[#38BDF8]">
+          <HeadphoneZoneLogo className="w-9 h-9" />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">
           Welcome to the Team

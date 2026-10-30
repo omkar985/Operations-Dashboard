@@ -9,6 +9,13 @@ export const metadata: Metadata = {
   },
   description: "High-precision full-stack operations management and workflow telemetry platform.",
   robots: { index: false, follow: false },
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: "/apple-icon",
+  },
 };
 
 const themeScript = `

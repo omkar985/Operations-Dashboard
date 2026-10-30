@@ -3,7 +3,8 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Radio, AlertCircle, ArrowRight, Lock, Mail, Eye, EyeOff } from "lucide-react";
+import { AlertCircle, ArrowRight, Lock, Mail, Eye, EyeOff } from "lucide-react";
+import { HeadphoneZoneLogo } from "@/components/ui/headphone-zone-logo";
 
 function LoginForm() {
   const router = useRouter();
@@ -55,8 +56,8 @@ function LoginForm() {
 
       {/* Brand Header */}
       <div className="flex flex-col items-center text-center mb-8">
-        <div className="w-16 h-16 rounded-2xl bg-[var(--raised)] border border-[var(--line)] flex items-center justify-center mb-4 text-[#0284C7] dark:text-[#38BDF8]">
-          <Radio className="w-8 h-8 stroke-[2.2]" />
+        <div className="w-16 h-16 rounded-2xl bg-[var(--raised)] border border-[var(--line)] flex items-center justify-center mb-4 text-[#1588C9] dark:text-[#38BDF8]">
+          <HeadphoneZoneLogo className="w-9 h-9" />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">
           Operations Command Centre

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Mail, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle } from "lucide-react";
+import { HeadphoneZoneLogo } from "@/components/ui/headphone-zone-logo";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -43,13 +44,18 @@ export default function ForgotPasswordPage() {
       {/* Radiant Top Luminous Highlight */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#38BDF8] to-transparent opacity-80" />
 
-      <Link
-        href="/login"
-        className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--ink)] mb-6 transition-colors font-medium group"
-      >
-        <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
-        <span>Back to sign in</span>
-      </Link>
+      <div className="flex items-center justify-between mb-6">
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors font-medium group"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
+          <span>Back to sign in</span>
+        </Link>
+        <div className="w-8 h-8 rounded-lg bg-[var(--raised)] border border-[var(--line)] flex items-center justify-center text-[#1588C9] dark:text-[#38BDF8]">
+          <HeadphoneZoneLogo className="w-4.5 h-4.5" />
+        </div>
+      </div>
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">
