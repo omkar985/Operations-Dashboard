@@ -89,13 +89,13 @@ export function OutboxManager({ initialNotifications }: OutboxManagerProps) {
           <table className="table">
             <thead>
               <tr>
-                <th>Recipient</th>
-                <th>Subject</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Attempts</th>
-                <th>Created</th>
-                <th className="num">Actions</th>
+                <th className="min-w-[180px]">Recipient</th>
+                <th className="min-w-[220px]">Subject</th>
+                <th className="w-28">Type</th>
+                <th className="w-32">Status</th>
+                <th className="w-24">Attempts</th>
+                <th className="w-36">Created</th>
+                <th className="w-28 num text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -164,7 +164,7 @@ export function OutboxManager({ initialNotifications }: OutboxManagerProps) {
                         {item.status === "failed" && (
                           <button
                             type="button"
-                            className="btn btn-ghost btn-sm !h-7 !text-xs !px-2 text-[var(--primary-ink)]"
+                            className="btn btn-ghost btn-sm !h-8 !text-xs !px-2.5 rounded-lg text-[var(--primary-ink)]"
                             onClick={() => handleRetry(item.id)}
                             disabled={retryingId === item.id}
                             title="Reset attempt count and redeliver now"

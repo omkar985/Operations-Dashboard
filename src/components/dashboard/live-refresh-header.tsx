@@ -17,14 +17,16 @@ export function LiveRefreshHeader({ exportUrl }: LiveRefreshHeaderProps) {
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
   useEffect(() => {
-    setLastUpdated(
-      new Date().toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      })
-    );
+    const timer = setTimeout(() => {
+      setLastUpdated(
+        new Date().toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        })
+      );
+    }, 0);
 
     const interval = setInterval(() => {
       setSecondsLeft((prev) => {
@@ -44,7 +46,10 @@ export function LiveRefreshHeader({ exportUrl }: LiveRefreshHeaderProps) {
       });
     }, 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [router]);
 
   async function handleManualRefresh() {
@@ -92,14 +97,14 @@ export function LiveRefreshHeader({ exportUrl }: LiveRefreshHeaderProps) {
           type="button"
           onClick={handleManualRefresh}
           disabled={isRefreshing}
-          className="btn btn-sm btn-ghost h-8 px-2.5 text-xs font-medium border border-[var(--line)] bg-[var(--card)] hover:border-[var(--line-hover)] flex items-center gap-1.5 shadow-xs"
+          className="btn btn-sm h-8 px-2.5 text-xs font-medium border border-[var(--line)] bg-[var(--card)] text-[var(--ink)] hover:border-[var(--line-hover)] flex items-center gap-1.5 shadow-xs"
           title="Refresh operations dataset"
         >
           <RefreshCw className={`w-3 h-3 text-[var(--primary-ink)] ${isRefreshing ? "spin" : ""}`} />
           <span>Refresh ({secondsLeft} s)</span>
         </button>
 
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 text-xs font-semibold">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 text-xs font-semibold">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           <span>Live</span>
         </div>
@@ -107,11 +112,11 @@ export function LiveRefreshHeader({ exportUrl }: LiveRefreshHeaderProps) {
         {/* Export CSV button */}
         <a
           href={exportUrl}
-          className="btn btn-sm btn-ghost h-8 px-2.5 text-xs text-[var(--muted-strong)] hover:text-[var(--ink)] border border-[var(--line)] bg-[var(--card)] shadow-xs"
+          className="btn btn-sm h-8 px-2.5 text-xs text-[var(--ink)] border border-[var(--line)] bg-[var(--card)] shadow-xs"
           title="Export filtered records to CSV"
           download
         >
-          <Download className="w-3 h-3" />
+          <Download className="w-3 h-3 text-[var(--muted)]" />
           <span className="hidden sm:inline">Export</span>
         </a>
       </div>

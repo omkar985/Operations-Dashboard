@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserX, UserCheck, Search } from "lucide-react";
+import { UserX, UserCheck, Search, X } from "lucide-react";
 import type { UserRow, UserRole } from "@/types/db";
 import type { SessionUser } from "@/lib/auth/session";
 import { useToast } from "@/components/providers/toast-provider";
@@ -123,23 +123,33 @@ export function MembersManager({ currentUser, initialUsers }: MembersManagerProp
     <>
       <div className="panel overflow-hidden">
         {/* Header Controls */}
-        <div className="panel-head flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-3">
+        <div className="panel-head flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="panel-title">Active Team Roster</h2>
             <p className="panel-sub">
-              {users.length} members with authorized Operations Dashboard access
+              {users.length} member{users.length === 1 ? "" : "s"} with authorized Operations Dashboard access
             </p>
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 text-[var(--muted)] absolute left-3 top-2.5 pointer-events-none" />
+          <div className="relative w-full sm:w-72 shrink-0">
+            <Search className="w-4 h-4 text-[var(--muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or email..."
-              className="input pl-8 text-xs h-8"
+              className="input input-search !h-9 text-xs w-full rounded-lg"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--ink)] p-0.5 rounded transition-colors"
+                aria-label="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -148,12 +158,12 @@ export function MembersManager({ currentUser, initialUsers }: MembersManagerProp
           <table className="table">
             <thead>
               <tr>
-                <th>Member</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Last Login</th>
-                <th>Joined</th>
-                <th className="num">Actions</th>
+                <th className="min-w-[240px]">Member</th>
+                <th className="w-32">Role</th>
+                <th className="w-28">Status</th>
+                <th className="w-36">Last Login</th>
+                <th className="w-36">Joined</th>
+                <th className="w-28 num text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -171,15 +181,15 @@ export function MembersManager({ currentUser, initialUsers }: MembersManagerProp
                   return (
                     <tr key={member.id}>
                       <td>
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-[var(--raised)] border border-[var(--line-subtle)] font-bold text-xs text-[var(--primary)]">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--raised)] border border-[var(--line-subtle)] font-bold text-xs text-[var(--primary)] shrink-0">
                             {member.name.charAt(0).toUpperCase()}
                           </div>
-                          <div className="flex flex-col">
-                            <span className="font-medium text-xs text-[var(--ink)]">
-                              {member.name} {isSelf && <span className="text-[10px] text-[var(--primary-ink)] font-bold">(You)</span>}
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-semibold text-xs text-[var(--ink)] truncate">
+                              {member.name} {isSelf && <span className="text-[10px] text-[var(--primary-ink)] font-bold ml-1">(You)</span>}
                             </span>
-                            <span className="text-[11px] text-[var(--muted)] font-mono">
+                            <span className="text-[11px] text-[var(--muted)] font-mono mt-0.5 truncate">
                               {member.email}
                             </span>
                           </div>
@@ -192,7 +202,7 @@ export function MembersManager({ currentUser, initialUsers }: MembersManagerProp
                             value={member.role}
                             onChange={(e) => promptRoleChange(member, e.target.value as UserRole)}
                             disabled={isSoleAdmin}
-                            className="select !h-7 !text-xs !py-0 !px-2 rounded w-24"
+                            className="select !h-8 !text-xs !py-0 !pl-2.5 !pr-7 rounded-lg w-24"
                             title={isSoleAdmin ? "Cannot demote the last remaining active administrator." : undefined}
                           >
                             <option value="USER">USER</option>
@@ -232,7 +242,7 @@ export function MembersManager({ currentUser, initialUsers }: MembersManagerProp
                       <td className="num">
                         <button
                           type="button"
-                          className={`btn btn-sm !h-7 !text-xs !px-2 ${
+                          className={`btn btn-sm !h-8 !text-xs !px-3 gap-1.5 ${
                             member.is_active ? "btn-danger" : "btn-primary"
                           }`}
                           onClick={() => promptStatusChange(member, !member.is_active)}

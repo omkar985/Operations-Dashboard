@@ -266,7 +266,7 @@ export function SystemManager({
 
       {/* 3. Recent Synchronization Runs */}
       <section className="panel overflow-hidden">
-        <div className="panel-head pb-3">
+        <div className="panel-head">
           <div>
             <h2 className="panel-title">Data Synchronization History</h2>
             <p className="panel-sub">
@@ -279,12 +279,12 @@ export function SystemManager({
           <table className="table">
             <thead>
               <tr>
-                <th>Trigger</th>
-                <th>Status</th>
-                <th>Started</th>
-                <th>Duration</th>
-                <th>Records</th>
-                <th>Error</th>
+                <th className="w-28">Trigger</th>
+                <th className="w-28">Status</th>
+                <th className="w-36">Started</th>
+                <th className="w-28">Duration</th>
+                <th className="w-28">Records</th>
+                <th className="min-w-[200px]">Error</th>
               </tr>
             </thead>
             <tbody>
@@ -347,7 +347,7 @@ export function SystemManager({
 
       {/* 4. System Audit Trail */}
       <section className="panel overflow-hidden">
-        <div className="panel-head pb-3">
+        <div className="panel-head">
           <div>
             <h2 className="panel-title">Security &amp; Administrative Audit Trail</h2>
             <p className="panel-sub">
@@ -360,10 +360,10 @@ export function SystemManager({
           <table className="table">
             <thead>
               <tr>
-                <th>Action</th>
-                <th>Actor</th>
-                <th>Timestamp</th>
-                <th>IP Address</th>
+                <th className="w-48">Action</th>
+                <th className="min-w-[200px]">Actor</th>
+                <th className="w-40">Timestamp</th>
+                <th className="w-36">IP Address</th>
               </tr>
             </thead>
             <tbody>

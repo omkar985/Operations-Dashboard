@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, AlertTriangle, ArrowRight, Settings2, RefreshCw } from "lucide-react";
+import { AlertTriangle, ArrowRight, Settings2, RefreshCw } from "lucide-react";
 import { getDataset } from "@/server/services/dataset-service";
 import { getThresholds } from "@/server/services/settings-service";
 import { parseRange } from "@/lib/metrics/range";
@@ -127,7 +127,7 @@ export default async function DashboardPage(props: DashboardPageProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="page-title dm-serif-display-regular">Operations Dashboard</h1>
-          <p className="text-xs sm:text-sm text-[var(--muted)] mt-1">
+          <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-400 mt-1">
             {parsedRange.label} &bull; in progress &bull; {dataset.records.length.toLocaleString()} total operational records
           </p>
         </div>

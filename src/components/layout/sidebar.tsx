@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   TableProperties,
@@ -47,13 +47,17 @@ const ADMIN_NAV: NavItem[] = [
   { label: "System & Audit Logs", href: "/admin/system", icon: ShieldCheck },
 ];
 
+const emptySubscribe = () => () => {};
+function useMounted() {
+  return useSyncExternalStore(emptySubscribe, () => true, () => false);
+}
+
 /** Real-time 12-hour clock ticking live with seconds and AM/PM */
 function useRealtimeClock() {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    setMounted(true);
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -84,7 +88,6 @@ function useRealtimeClock() {
 
 export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { resolvedTheme, toggleTheme } = useTheme();
   const { timeStr, dateStr } = useRealtimeClock();
 
@@ -111,18 +114,22 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
       >
         {/* Top Header & Brand */}
         <div className="flex flex-col min-h-0 flex-1">
-          <div className="flex items-center px-5 h-[64px] border-b border-[var(--line-subtle)] shrink-0">
+          <div className="flex items-center px-5 pt-5 pb-3 shrink-0">
             <Link
               href="/dashboard"
               className="flex items-center gap-3 text-inherit no-underline hover:no-underline group min-w-0"
               onClick={onClose}
             >
-              <HeadphoneZoneLogo size={28} className="text-[#1588C9] dark:text-[#38BDF8] shrink-0" aria-hidden />
+              <HeadphoneZoneLogo
+                size={28}
+                className="text-[#0284C7] dark:text-[#00F0FF] shrink-0 transition-colors"
+                aria-hidden
+              />
               <div className="leading-tight min-w-0">
                 <p className="dm-serif-display-regular text-[18px] text-[var(--ink)] tracking-tight whitespace-nowrap">
                   Operations Dashboard
                 </p>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
                   Headphone Zone
                 </p>
               </div>
@@ -132,7 +139,9 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
           {/* Navigation Links */}
           <nav className="p-3 space-y-5 overflow-y-auto flex-1">
             <div>
-              <div className="eyebrow px-3 mb-2 text-[10px]">Operations</div>
+              <div className="px-3 mb-2 text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                Operations
+              </div>
               <ul className="space-y-1 list-none p-0 m-0">
                 {OPERATIONS_NAV.map((item) => {
                   const active = isActive(item.href);
@@ -141,10 +150,10 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                     <li key={item.href}>
                       <Link
                         href={item.href}
-                        className={`group relative flex h-10 items-center gap-3 rounded-[10px] px-3 text-[13.5px] font-medium transition-all duration-150 ${
+                        className={`group relative flex h-10 items-center gap-3 rounded-xl px-3 overflow-hidden text-[13.5px] font-medium transition-all duration-150 ${
                           active
-                            ? "bg-[var(--card)] text-white font-semibold shadow-xs border border-[var(--line-subtle)]"
-                            : "text-[#94A3B8] hover:bg-[var(--surface-hover)] hover:text-white"
+                            ? "bg-[var(--primary-soft)] text-[var(--primary-ink)] font-semibold border border-[var(--primary-soft)] dark:bg-white/10 dark:text-white dark:border-white/10 shadow-xs"
+                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 dark:text-slate-400 dark:hover:text-white dark:hover:bg-white/6"
                         }`}
                         aria-current={active ? "page" : undefined}
                         onClick={onClose}
@@ -152,21 +161,21 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                         {active && (
                           <span
                             aria-hidden
-                            className="absolute left-0 top-2.5 h-5 w-[3px] rounded-r-full bg-[#1588C9] dark:bg-[#38BDF8]"
+                            className="absolute left-1 top-2.5 h-5 w-[3px] rounded-full bg-[var(--primary)] dark:bg-[#00F0FF]"
                           />
                         )}
                         <Icon
                           className={`w-4 h-4 shrink-0 transition-colors ${
                             active
-                              ? "text-[#1588C9] dark:text-[#38BDF8]"
-                              : "text-[#94A3B8] group-hover:text-white"
+                              ? "text-[var(--primary)] dark:text-[#00F0FF]"
+                              : "text-slate-400 group-hover:text-slate-800 dark:text-slate-400 dark:group-hover:text-white"
                           }`}
                         />
                         <span
                           className={`transition-colors ${
                             active
-                              ? "text-slate-900 dark:text-white font-semibold"
-                              : "text-[#94A3B8] group-hover:text-slate-900 dark:group-hover:text-white"
+                              ? "text-[var(--primary-ink)] dark:text-white font-semibold"
+                              : "text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-white"
                           }`}
                         >
                           {item.label}
@@ -180,7 +189,9 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
 
             {user.role === "ADMIN" && (
               <div>
-                <div className="eyebrow px-3 mb-2 text-[10px]">Administration</div>
+                <div className="px-3 mb-2 text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                  Administration
+                </div>
                 <ul className="space-y-1 list-none p-0 m-0">
                   {ADMIN_NAV.map((item) => {
                     const active = isActive(item.href);
@@ -190,10 +201,10 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                         <Link
                           key={item.href}
                           href={item.href}
-                          className={`group relative flex h-10 items-center gap-3 rounded-[10px] px-3 text-[13.5px] font-medium transition-all duration-150 ${
+                          className={`group relative flex h-10 items-center gap-3 rounded-xl px-3 overflow-hidden text-[13.5px] font-medium transition-all duration-150 ${
                             active
-                              ? "bg-[var(--card)] text-white font-semibold shadow-xs border border-[var(--line-subtle)]"
-                              : "text-[#94A3B8] hover:bg-[var(--surface-hover)] hover:text-white"
+                              ? "bg-[var(--primary-soft)] text-[var(--primary-ink)] font-semibold border border-[var(--primary-soft)] dark:bg-white/10 dark:text-white dark:border-white/10 shadow-xs"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 dark:text-slate-400 dark:hover:text-white dark:hover:bg-white/6"
                           }`}
                           aria-current={active ? "page" : undefined}
                           onClick={onClose}
@@ -201,21 +212,21 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                           {active && (
                             <span
                               aria-hidden
-                              className="absolute left-0 top-2.5 h-5 w-[3px] rounded-r-full bg-[#1588C9] dark:bg-[#38BDF8]"
+                              className="absolute left-1 top-2.5 h-5 w-[3px] rounded-full bg-[var(--primary)] dark:bg-[#00F0FF]"
                             />
                           )}
                           <Icon
                             className={`w-4 h-4 shrink-0 transition-colors ${
                               active
-                                ? "text-[#1588C9] dark:text-[#38BDF8]"
-                                : "text-[#94A3B8] group-hover:text-white"
+                                ? "text-[var(--primary)] dark:text-[#00F0FF]"
+                                : "text-slate-400 group-hover:text-slate-800 dark:text-slate-400 dark:group-hover:text-white"
                             }`}
                           />
                           <span
                             className={`transition-colors ${
                               active
-                                ? "text-slate-900 dark:text-white font-semibold"
-                                : "text-[#94A3B8] group-hover:text-slate-900 dark:group-hover:text-white"
+                                ? "text-[var(--primary-ink)] dark:text-white font-semibold"
+                                : "text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-white"
                             }`}
                           >
                             {item.label}
@@ -231,17 +242,18 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
         </div>
 
         {/* Sidebar Bottom: Theme Switcher & Real-time 12-HR Clock */}
-        <div className="p-3 border-t border-[var(--line-subtle)] shrink-0">
-          <div
-            className="flex flex-col gap-2.5 rounded-xl p-3 border border-[var(--line)] bg-[var(--card)] text-[var(--ink)] shadow-xs"
-          >
+        <div className="p-3 border-t border-[var(--line)] shrink-0">
+          <div className="flex flex-col gap-2.5 rounded-xl p-3 border border-[var(--line)] bg-[var(--raised)] text-[var(--ink)] shadow-xs">
             {/* Theme Switch */}
             <div className="flex items-center justify-between pb-2 border-b border-[var(--line-subtle)]">
-              <span className="text-[12px] font-medium text-[var(--muted)] flex items-center gap-1.5">
+              <span
+                className="text-[12px] font-medium text-[var(--muted-strong)] flex items-center gap-1.5"
+                suppressHydrationWarning
+              >
                 {resolvedTheme === "dark" ? (
-                  <Moon className="w-3.5 h-3.5 text-[var(--primary-ink)]" />
+                  <Moon className="w-3.5 h-3.5 text-sky-400" />
                 ) : (
-                  <Sun className="w-3.5 h-3.5 text-[var(--primary-ink)]" />
+                  <Sun className="w-3.5 h-3.5 text-amber-500" />
                 )}
                 {resolvedTheme === "dark" ? "Dark theme" : "Light theme"}
               </span>
@@ -249,13 +261,10 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                 type="button"
                 onClick={toggleTheme}
                 aria-label={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} mode`}
-                className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-[var(--line)] transition-colors duration-200 ease-in-out focus:outline-none"
-                style={{
-                  background:
-                    resolvedTheme === "dark"
-                      ? "var(--primary)"
-                      : "rgba(100, 116, 139, 0.25)",
-                }}
+                suppressHydrationWarning
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-[var(--line)] transition-colors duration-200 ease-in-out focus:outline-none ${
+                  resolvedTheme === "dark" ? "bg-sky-500" : "bg-amber-500"
+                }`}
               >
                 <span
                   className={`pointer-events-none inline-block size-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out mt-[2px] ${
@@ -270,7 +279,7 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
               <span className="text-[11px] font-medium text-[var(--muted)]">
                 {dateStr}
               </span>
-              <span className="text-[13px] font-bold text-[var(--ink)] tracking-tight tnum mt-0.5">
+              <span className="text-[13px] font-bold text-[var(--ink)] tracking-tight font-mono mt-0.5">
                 {timeStr}
               </span>
             </div>

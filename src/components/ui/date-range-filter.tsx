@@ -50,7 +50,11 @@ export function DateRangeFilter({ currentRange, className = "" }: DateRangeFilte
               type="button"
               onClick={() => applyRange(p.key)}
               aria-pressed={active}
-              className={`transition-colors ${active ? "text-[var(--primary-ink)]" : "text-[var(--muted)]"}`}
+              className={`transition-colors ${
+                active
+                  ? "text-[#0284C7] dark:text-[#38BDF8] font-semibold"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
             >
               {p.label}
             </button>
@@ -63,7 +67,9 @@ export function DateRangeFilter({ currentRange, className = "" }: DateRangeFilte
           aria-pressed={currentRange.key === "custom" || openCustom}
           aria-expanded={openCustom}
           className={`flex items-center gap-1 transition-colors ${
-            currentRange.key === "custom" ? "text-[var(--primary-ink)]" : "text-[var(--muted)]"
+            currentRange.key === "custom"
+              ? "text-[#0284C7] dark:text-[#38BDF8] font-semibold"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
           }`}
           title="Custom date range"
         >

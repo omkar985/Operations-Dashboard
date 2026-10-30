@@ -197,7 +197,7 @@ export default async function ReportsPage(props: ReportsPageProps) {
 
       {/* Team SLA Performance Ledger */}
       <div className="panel overflow-hidden">
-        <div className="panel-head pb-3">
+        <div className="panel-head">
           <div>
             <h2 className="panel-title">Team Performance Breakdown</h2>
             <p className="panel-sub">
@@ -210,11 +210,11 @@ export default async function ReportsPage(props: ReportsPageProps) {
           <table className="table">
             <thead>
               <tr>
-                <th>Team / Department</th>
-                <th className="num">Total Inflow</th>
-                <th className="num">Open Items</th>
-                <th className="num">Overdue</th>
-                <th className="num">SLA Compliance</th>
+                <th className="min-w-[220px]">Team / Department</th>
+                <th className="w-32 num">Total Inflow</th>
+                <th className="w-32 num">Open Items</th>
+                <th className="w-28 num">Overdue</th>
+                <th className="w-36 num">SLA Compliance</th>
               </tr>
             </thead>
             <tbody>

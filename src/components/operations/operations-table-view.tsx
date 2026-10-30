@@ -86,7 +86,7 @@ export function OperationsTableView({
               <tr>
                 <th
                   onClick={() => handleSort("id")}
-                  className="cursor-pointer group select-none"
+                  className="w-28 cursor-pointer group select-none"
                 >
                   <div className="flex items-center gap-1.5">
                     <span>ID</span>
@@ -95,7 +95,7 @@ export function OperationsTableView({
                 </th>
                 <th
                   onClick={() => handleSort("title")}
-                  className="cursor-pointer group select-none"
+                  className="min-w-[240px] cursor-pointer group select-none"
                 >
                   <div className="flex items-center gap-1.5">
                     <span>Title</span>
@@ -104,7 +104,7 @@ export function OperationsTableView({
                 </th>
                 <th
                   onClick={() => handleSort("status")}
-                  className="cursor-pointer group select-none"
+                  className="w-28 cursor-pointer group select-none"
                 >
                   <div className="flex items-center gap-1.5">
                     <span>Status</span>
@@ -113,7 +113,7 @@ export function OperationsTableView({
                 </th>
                 <th
                   onClick={() => handleSort("priority")}
-                  className="cursor-pointer group select-none"
+                  className="w-28 cursor-pointer group select-none"
                 >
                   <div className="flex items-center gap-1.5">
                     <span>Priority</span>
@@ -122,7 +122,7 @@ export function OperationsTableView({
                 </th>
                 <th
                   onClick={() => handleSort("team")}
-                  className="cursor-pointer group select-none"
+                  className="w-32 cursor-pointer group select-none"
                 >
                   <div className="flex items-center gap-1.5">
                     <span>Team</span>
@@ -131,7 +131,7 @@ export function OperationsTableView({
                 </th>
                 <th
                   onClick={() => handleSort("assignee")}
-                  className="cursor-pointer group select-none"
+                  className="w-36 cursor-pointer group select-none"
                 >
                   <div className="flex items-center gap-1.5">
                     <span>Assignee</span>
@@ -140,7 +140,7 @@ export function OperationsTableView({
                 </th>
                 <th
                   onClick={() => handleSort("createdAt")}
-                  className="cursor-pointer group select-none"
+                  className="w-32 cursor-pointer group select-none"
                 >
                   <div className="flex items-center gap-1.5">
                     <span>Created</span>
@@ -149,7 +149,7 @@ export function OperationsTableView({
                 </th>
                 <th
                   onClick={() => handleSort("dueAt")}
-                  className="cursor-pointer group select-none"
+                  className="w-32 cursor-pointer group select-none"
                 >
                   <div className="flex items-center gap-1.5">
                     <span>Due Date</span>

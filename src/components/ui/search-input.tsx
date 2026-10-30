@@ -66,7 +66,7 @@ export function SearchInput({
 
   return (
     <form onSubmit={handleSubmit} className={`relative flex items-center group ${className}`}>
-      <Search className="w-4 h-4 text-[var(--muted)] group-focus-within:text-[var(--primary)] transition-colors absolute left-3.5 pointer-events-none" />
+      <Search className="w-4 h-4 text-[var(--muted)] group-focus-within:text-[var(--primary)] transition-colors absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
       <input
         ref={inputRef}
         type="search"
@@ -79,7 +79,7 @@ export function SearchInput({
         <button
           type="button"
           onClick={handleClear}
-          className="absolute right-3 text-[var(--muted)] hover:text-[var(--ink)] p-1 rounded-md transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--ink)] p-1 rounded-md transition-colors"
           aria-label="Clear search"
         >
           <X className="w-3.5 h-3.5" />

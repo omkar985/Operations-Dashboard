@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { RefreshCw, Settings, LogOut } from "lucide-react";
+import { Settings, LogOut } from "lucide-react";
 import { HeadphoneZoneLogo } from "@/components/ui/headphone-zone-logo";
-import { useToast } from "@/components/providers/toast-provider";
 import type { Freshness } from "@/server/services/dataset-service";
 import type { SessionUser } from "@/lib/auth/session";
 
@@ -28,43 +26,6 @@ function formatAge(ageSeconds: number | null): string {
 
 export function Topbar({ user, freshness }: TopbarProps) {
   const router = useRouter();
-  const toast = useToast();
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  async function handleRefresh() {
-    if (isRefreshing) return;
-    setIsRefreshing(true);
-
-    try {
-      const res = await fetch("/api/data/refresh", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      const body = await res.json().catch(() => ({}));
-
-      if (res.ok) {
-        toast.success(
-          "Data Refreshed",
-          body.data?.recordCount !== undefined
-            ? `Successfully synchronized ${body.data.recordCount.toLocaleString()} operational records.`
-            : "Operations ledger synchronized from Google Sheets."
-        );
-        router.refresh();
-      } else if (res.status === 409) {
-        toast.info("Sync In Progress", "A background sync is already executing.");
-      } else {
-        toast.error(
-          "Sync Failed",
-          body.error?.message || "Failed to trigger synchronization with Google Sheets."
-        );
-      }
-    } catch {
-      toast.error("Network Error", "Unable to contact the synchronization service.");
-    } finally {
-      setIsRefreshing(false);
-    }
-  }
 
   async function handleSignOut() {
     try {
@@ -76,7 +37,7 @@ export function Topbar({ user, freshness }: TopbarProps) {
     }
   }
 
-  const isRunning = freshness.lastRunStatus === "running" || isRefreshing;
+  const isRunning = freshness.lastRunStatus === "running";
   const isStale = freshness.stale;
   const hasError = freshness.lastError !== null;
   const isAdmin = user.role === "ADMIN";
@@ -97,14 +58,14 @@ export function Topbar({ user, freshness }: TopbarProps) {
           <div
             className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-semibold border backdrop-blur-md transition-all ${
               !freshness.configured
-                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/25"
                 : isRunning
-                ? "bg-sky-500/15 text-sky-600 dark:text-sky-300 border-sky-500/30"
+                ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30"
                 : hasError
-                ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/25"
+                ? "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/25"
                 : isStale
-                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
-                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
+                ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/25"
+                : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/25"
             }`}
           >
             <span
@@ -148,7 +109,7 @@ export function Topbar({ user, freshness }: TopbarProps) {
               {user.email}
             </span>
             {isAdmin ? (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 leading-none">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 leading-none">
                 Admin
               </span>
             ) : (
@@ -163,11 +124,11 @@ export function Topbar({ user, freshness }: TopbarProps) {
         {isAdmin && (
           <Link
             href="/admin/members"
-            className="inline-flex items-center justify-center gap-2 h-9 px-3 sm:px-3.5 rounded-xl border border-[var(--line)] bg-[var(--card)] text-[var(--ink)] hover:border-[var(--line-hover)] hover:bg-[var(--surface-hover)] shadow-xs text-xs sm:text-[13px] font-medium transition-all select-none cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 h-9 px-3 sm:px-3.5 rounded-xl border border-[var(--line)] bg-[var(--card)] text-[var(--ink)] hover:border-[var(--line-hover)] hover:bg-[var(--surface-hover)] shadow-xs text-xs sm:text-[13px] font-medium transition-all select-none cursor-pointer group"
             title="Open Admin Settings"
             aria-label="Admin Settings"
           >
-            <Settings className="w-4 h-4 shrink-0 text-[var(--muted-strong)]" />
+            <Settings className="w-4 h-4 shrink-0 text-[var(--muted)] group-hover:text-[var(--ink)] transition-colors" />
             <span className="hidden sm:inline leading-none font-medium">Admin Settings</span>
           </Link>
         )}
@@ -176,11 +137,11 @@ export function Topbar({ user, freshness }: TopbarProps) {
         <button
           type="button"
           onClick={handleSignOut}
-          className="inline-flex items-center justify-center gap-2 h-9 px-3 sm:px-3.5 rounded-xl border border-[var(--line)] bg-[var(--card)] text-[var(--muted-strong)] hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 shadow-xs text-xs sm:text-[13px] font-medium transition-all select-none cursor-pointer"
+          className="inline-flex items-center justify-center gap-2 h-9 px-3 sm:px-3.5 rounded-xl border border-[var(--line)] bg-[var(--card)] text-[var(--ink)] hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 shadow-xs text-xs sm:text-[13px] font-medium transition-all select-none cursor-pointer group"
           title="Sign out of Operations Dashboard"
           aria-label="Sign out"
         >
-          <LogOut className="w-4 h-4 shrink-0" />
+          <LogOut className="w-4 h-4 shrink-0 text-[var(--muted)] group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors" />
           <span className="hidden sm:inline leading-none font-medium">Sign Out</span>
         </button>
       </div>

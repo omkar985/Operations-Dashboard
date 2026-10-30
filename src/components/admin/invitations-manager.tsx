@@ -261,18 +261,18 @@ export function InvitationsManager({ initialInvitations }: InvitationsManagerPro
             <table className="table">
               <thead>
                 <tr>
-                  <th>Recipient Email</th>
-                  <th>Assigned Role</th>
-                  <th>Status</th>
-                  <th>Invited By</th>
-                  <th>Expires</th>
-                  <th className="num">Actions</th>
+                  <th className="min-w-[240px]">Recipient Email</th>
+                  <th className="w-32">Assigned Role</th>
+                  <th className="w-28">Status</th>
+                  <th className="min-w-[160px]">Invited By</th>
+                  <th className="w-36">Expires</th>
+                  <th className="w-32 num text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {invitations.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-[var(--muted)]">
+                    <td colSpan={6} className="text-center py-10 text-[var(--muted)]">
                       No invitations have been dispatched yet.
                     </td>
                   </tr>
@@ -283,7 +283,7 @@ export function InvitationsManager({ initialInvitations }: InvitationsManagerPro
 
                     return (
                       <tr key={invite.id}>
-                        <td className="font-medium text-xs text-[var(--ink)]">
+                        <td className="font-semibold text-xs text-[var(--ink)]">
                           {invite.email}
                         </td>
 
@@ -311,7 +311,7 @@ export function InvitationsManager({ initialInvitations }: InvitationsManagerPro
                           </span>
                         </td>
 
-                        <td className="text-xs text-[var(--muted)]">
+                        <td className="text-xs text-[var(--muted-strong)]">
                           {invite.inviter?.name || invite.inviter?.email || "System"}
                         </td>
 
@@ -323,12 +323,12 @@ export function InvitationsManager({ initialInvitations }: InvitationsManagerPro
                           })}
                         </td>
 
-                        <td className="num">
+                        <td className="num text-right">
                           {isPending && (
-                            <div className="inline-flex items-center gap-1.5">
+                            <div className="inline-flex items-center justify-end gap-1.5">
                               <button
                                 type="button"
-                                className="btn btn-ghost btn-sm !h-7 !text-xs !px-2 text-[var(--primary-ink)]"
+                                className="btn btn-ghost btn-sm !h-8 !text-xs !px-2.5 text-[var(--primary-ink)]"
                                 onClick={() => handleResend(invite)}
                                 title="Rotate token and dispatch new email"
                               >
@@ -338,7 +338,7 @@ export function InvitationsManager({ initialInvitations }: InvitationsManagerPro
 
                               <button
                                 type="button"
-                                className="btn btn-ghost btn-sm !h-7 !text-xs !px-2 text-red-600 hover:text-red-700"
+                                className="btn btn-ghost btn-sm !h-8 !text-xs !px-2.5 text-red-600 hover:text-red-700 hover:bg-red-500/10"
                                 onClick={() => setRevokeTarget(invite)}
                                 title="Revoke invitation"
                               >

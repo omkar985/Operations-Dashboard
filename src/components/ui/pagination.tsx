@@ -43,7 +43,7 @@ export function Pagination({
   const endIdx = Math.min(page * pageSize, total);
 
   return (
-    <div className={`flex flex-wrap items-center justify-between gap-4 py-3 px-4 border-t border-[var(--line-subtle)] text-xs text-[var(--muted)] ${className}`}>
+    <div className={`flex flex-wrap items-center justify-between gap-4 py-3.5 px-5 border-t border-[var(--line-subtle)] text-xs text-[var(--muted)] ${className}`}>
       <div className="flex items-center gap-2">
         <span>Showing</span>
         <span className="font-semibold text-[var(--ink)] tnum">

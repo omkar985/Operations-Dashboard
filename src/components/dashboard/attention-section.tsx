@@ -34,7 +34,7 @@ export function AttentionSection({ items }: AttentionSectionProps) {
   return (
     <>
       <div className="panel overflow-hidden">
-        <div className="panel-head flex items-center justify-between pb-3">
+        <div className="panel-head flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
               <h2 className="panel-title flex items-center gap-1.5 text-red-600 dark:text-red-400">
@@ -63,12 +63,12 @@ export function AttentionSection({ items }: AttentionSectionProps) {
           <table className="table">
             <thead>
               <tr>
-                <th>Record ID</th>
-                <th>Title / Description</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>Team</th>
-                <th>Breach Cause</th>
+                <th className="w-28">Record ID</th>
+                <th className="min-w-[240px]">Title / Description</th>
+                <th className="w-28">Status</th>
+                <th className="w-28">Priority</th>
+                <th className="w-36">Team</th>
+                <th className="w-44">Breach Cause</th>
               </tr>
             </thead>
             <tbody>

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { AppProviders } from "@/components/providers/app-providers";
+import { THEME_COOKIE } from "@/lib/auth/constants";
+import type { Theme } from "@/components/providers/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -28,26 +31,35 @@ const themeScript = `
       theme = 'dark';
     }
     document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.classList.toggle('light', theme === 'light');
   } catch(e) {}
 })();
 `;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const themeCookie = (cookieStore.get(THEME_COOKIE)?.value as Theme) || "dark";
+  const initialTheme = themeCookie === "light" ? "light" : "dark";
+
   return (
-    <html lang="en" data-theme="dark" suppressHydrationWarning>
+    <html lang="en" data-theme={initialTheme} className={initialTheme} suppressHydrationWarning>
       <head>
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+          suppressHydrationWarning
+        />
       </head>
       <body>
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
-        <AppProviders>{children}</AppProviders>
+        <AppProviders defaultTheme={initialTheme}>{children}</AppProviders>
       </body>
     </html>
   );

@@ -214,7 +214,7 @@ export function SourceMappingEditor({
 
       {/* 2. Column Mapping Matrix */}
       <section className="panel overflow-hidden">
-        <div className="panel-head pb-3">
+        <div className="panel-head">
           <div>
             <h2 className="panel-title">Column Mapping Matrix</h2>
             <p className="panel-sub">
@@ -227,9 +227,9 @@ export function SourceMappingEditor({
           <table className="table">
             <thead>
               <tr>
-                <th>Canonical Target</th>
-                <th>Kind</th>
-                <th>Spreadsheet Column Header</th>
+                <th className="min-w-[240px]">Canonical Target</th>
+                <th className="w-32">Kind</th>
+                <th className="min-w-[260px]">Spreadsheet Column Header</th>
               </tr>
             </thead>
             <tbody>
@@ -256,7 +256,7 @@ export function SourceMappingEditor({
                       </span>
                     </td>
 
-                    <td className="w-64">
+                    <td className="w-72">
                       <select
                         value={currentMapped}
                         onChange={(e) => {
@@ -268,7 +268,7 @@ export function SourceMappingEditor({
                             return next;
                           });
                         }}
-                        className="select !h-8 !text-xs rounded"
+                        className="select !h-8 !text-xs rounded-lg w-full"
                       >
                         <option value="">(Unmapped)</option>
                         {availableHeaders.map((h) => (

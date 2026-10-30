@@ -9,6 +9,7 @@ export type ResolvedTheme = "light" | "dark";
 interface ThemeContextValue {
   theme: Theme;
   resolvedTheme: ResolvedTheme;
+  mounted: boolean;
   setTheme: (t: Theme) => void;
   toggleTheme: () => void;
 }
@@ -20,14 +21,13 @@ function getSystemTheme(): ResolvedTheme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-function getInitialTheme(defaultTheme: Theme): Theme {
-  if (typeof window === "undefined") return defaultTheme;
-  const attr = document.documentElement.getAttribute("data-theme") as Theme | null;
-  return (localStorage.getItem("od-theme") as Theme | null) || attr || defaultTheme;
-}
-
 function resolveThemeValue(t: Theme): ResolvedTheme {
   return t === "system" ? "dark" : t;
+}
+
+const emptySubscribe = () => () => {};
+function useMounted() {
+  return React.useSyncExternalStore(emptySubscribe, () => true, () => false);
 }
 
 export function ThemeProvider({
@@ -37,10 +37,28 @@ export function ThemeProvider({
   children: React.ReactNode;
   defaultTheme?: Theme;
 }) {
-  const [theme, setThemeState] = useState<Theme>(() => getInitialTheme(defaultTheme));
+  const mounted = useMounted();
+  const [theme, setThemeState] = useState<Theme>(defaultTheme);
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
-    resolveThemeValue(getInitialTheme(defaultTheme))
+    resolveThemeValue(defaultTheme)
   );
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const stored = localStorage.getItem("od-theme") as Theme | null;
+      const attr = document.documentElement.getAttribute("data-theme") as Theme | null;
+      const clientTheme = stored || attr || defaultTheme;
+      if (clientTheme && clientTheme !== defaultTheme) {
+        const res = resolveThemeValue(clientTheme);
+        setThemeState(clientTheme);
+        setResolvedTheme(res);
+        document.documentElement.setAttribute("data-theme", res);
+        document.documentElement.classList.toggle("dark", res === "dark");
+        document.documentElement.classList.toggle("light", res === "light");
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [defaultTheme]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -49,6 +67,8 @@ export function ThemeProvider({
         const sys = e.matches ? "dark" : "light";
         setResolvedTheme(sys);
         document.documentElement.setAttribute("data-theme", sys);
+        document.documentElement.classList.toggle("dark", sys === "dark");
+        document.documentElement.classList.toggle("light", sys === "light");
       }
     };
 
@@ -65,6 +85,8 @@ export function ThemeProvider({
     const res = next === "system" ? getSystemTheme() : next;
     setResolvedTheme(res);
     document.documentElement.setAttribute("data-theme", res);
+    document.documentElement.classList.toggle("dark", res === "dark");
+    document.documentElement.classList.toggle("light", res === "light");
   };
 
   const toggleTheme = () => {
@@ -72,7 +94,7 @@ export function ThemeProvider({
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, resolvedTheme, mounted, setTheme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
