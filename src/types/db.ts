@@ -82,3 +82,22 @@ export interface SyncRunRow {
   triggered_by: string | null;
   snapshot_id: string | null;
 }
+
+export type IdempotencyStatus = "in_progress" | "completed" | "failed";
+
+export interface IdempotencyKeyRow {
+  id: string;
+  key: string;
+  scope: string;
+  user_id: string | null;
+  operation: string;
+  request_hash: string;
+  status: IdempotencyStatus;
+  response_status: number | null;
+  response_headers: Record<string, string>;
+  response_body: unknown;
+  created_at: string;
+  updated_at: string;
+  expires_at: string;
+}
+

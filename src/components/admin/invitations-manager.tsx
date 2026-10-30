@@ -7,6 +7,7 @@ import type { InvitationWithInviter } from "@/server/repositories/invitations";
 import type { UserRole } from "@/types/db";
 import { useToast } from "@/components/providers/toast-provider";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
+import { idempotentFetch } from "@/lib/http/idempotent-fetch";
 
 interface InvitationsManagerProps {
   initialInvitations: InvitationWithInviter[];
@@ -39,7 +40,7 @@ export function InvitationsManager({ initialInvitations }: InvitationsManagerPro
     setCreatedUrl(null);
 
     try {
-      const res = await fetch("/api/admin/invitations", {
+      const res = await idempotentFetch("/api/admin/invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, role }),
@@ -66,7 +67,7 @@ export function InvitationsManager({ initialInvitations }: InvitationsManagerPro
 
   async function handleResend(invite: InvitationWithInviter) {
     try {
-      const res = await fetch(`/api/admin/invitations/${invite.id}`, { method: "POST" });
+      const res = await idempotentFetch(`/api/admin/invitations/${invite.id}`, { method: "POST" });
       const body = await res.json().catch(() => ({}));
 
       if (res.ok) {
@@ -89,7 +90,7 @@ export function InvitationsManager({ initialInvitations }: InvitationsManagerPro
     setIsRevoking(true);
 
     try {
-      const res = await fetch(`/api/admin/invitations/${revokeTarget.id}`, { method: "DELETE" });
+      const res = await idempotentFetch(`/api/admin/invitations/${revokeTarget.id}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("Invitation Revoked", `The invitation for ${revokeTarget.email} was cancelled.`);
         setInvitations((prev) =>

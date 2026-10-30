@@ -6,6 +6,7 @@ import { RefreshCw, Gauge, Save } from "lucide-react";
 import type { RefreshSettings, Thresholds } from "@/types/operations";
 import type { SyncRunRow, AuditLogRow } from "@/types/db";
 import { useToast } from "@/components/providers/toast-provider";
+import { idempotentFetch } from "@/lib/http/idempotent-fetch";
 
 interface SystemManagerProps {
   initialRefresh: RefreshSettings;
@@ -41,7 +42,7 @@ export function SystemManager({
     setIsSavingRefresh(true);
 
     try {
-      const res = await fetch("/api/admin/settings/refresh", {
+      const res = await idempotentFetch("/api/admin/settings/refresh", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -70,7 +71,7 @@ export function SystemManager({
     setIsSavingThresholds(true);
 
     try {
-      const res = await fetch("/api/admin/settings/thresholds", {
+      const res = await idempotentFetch("/api/admin/settings/thresholds", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -99,7 +100,7 @@ export function SystemManager({
     setIsSyncing(true);
 
     try {
-      const res = await fetch("/api/data/refresh", { method: "POST" });
+      const res = await idempotentFetch("/api/data/refresh", { method: "POST" });
       const body = await res.json().catch(() => ({}));
 
       if (res.ok) {

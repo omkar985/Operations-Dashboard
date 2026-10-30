@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { RotateCcw } from "lucide-react";
 import type { NotificationRow } from "@/types/db";
 import { useToast } from "@/components/providers/toast-provider";
+import { idempotentFetch } from "@/lib/http/idempotent-fetch";
 
 interface OutboxManagerProps {
   initialNotifications: NotificationRow[];
@@ -28,7 +29,7 @@ export function OutboxManager({ initialNotifications }: OutboxManagerProps) {
     setRetryingId(id);
 
     try {
-      const res = await fetch(`/api/admin/outbox/${id}/retry`, { method: "POST" });
+      const res = await idempotentFetch(`/api/admin/outbox/${id}/retry`, { method: "POST" });
       const body = await res.json().catch(() => ({}));
 
       if (res.ok) {

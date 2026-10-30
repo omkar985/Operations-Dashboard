@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Download } from "lucide-react";
 import { useToast } from "@/components/providers/toast-provider";
+import { idempotentFetch } from "@/lib/http/idempotent-fetch";
 
 interface LiveRefreshHeaderProps {
   exportUrl: string;
@@ -56,7 +57,7 @@ export function LiveRefreshHeader({ exportUrl }: LiveRefreshHeaderProps) {
     if (isRefreshing) return;
     setIsRefreshing(true);
     try {
-      const res = await fetch("/api/data/refresh", {
+      const res = await idempotentFetch("/api/data/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });

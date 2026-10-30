@@ -7,6 +7,7 @@ import type { UserRow, UserRole } from "@/types/db";
 import type { SessionUser } from "@/lib/auth/session";
 import { useToast } from "@/components/providers/toast-provider";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
+import { idempotentFetch } from "@/lib/http/idempotent-fetch";
 
 interface MembersManagerProps {
   currentUser: SessionUser;
@@ -82,7 +83,7 @@ export function MembersManager({ currentUser, initialUsers }: MembersManagerProp
     setIsSubmitting(true);
 
     try {
-      const res = await fetch(`/api/admin/members/${targetUser.id}`, {
+      const res = await idempotentFetch(`/api/admin/members/${targetUser.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

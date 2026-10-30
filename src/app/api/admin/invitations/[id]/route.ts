@@ -12,12 +12,28 @@ const parseId = (id: string) => {
 };
 
 /** Resend = rotate the token (old link dies) + queue and deliver a new email. */
-export const POST = apiRoute<undefined, P>({ auth: "admin" }, async ({ user, ip, params }) => {
-  const result = await resendInvitation({ actor: user, id: parseId(params.id), ip });
-  return { result };
-});
+export const POST = apiRoute<undefined, P>(
+  {
+    auth: "admin",
+    rateLimit: "invitationResend",
+    idempotent: true,
+    operation: "admin.invitations.resend",
+  },
+  async ({ user, ip, params }) => {
+    const result = await resendInvitation({ actor: user, id: parseId(params.id), ip });
+    return { result };
+  }
+);
 
-export const DELETE = apiRoute<undefined, P>({ auth: "admin" }, async ({ user, ip, params }) => {
-  await revokeInvitationById({ actor: user, id: parseId(params.id), ip });
-  return { ok: true };
-});
+export const DELETE = apiRoute<undefined, P>(
+  {
+    auth: "admin",
+    rateLimit: "adminMutation",
+    idempotent: true,
+    operation: "admin.invitations.revoke",
+  },
+  async ({ user, ip, params }) => {
+    await revokeInvitationById({ actor: user, id: parseId(params.id), ip });
+    return { ok: true };
+  }
+);

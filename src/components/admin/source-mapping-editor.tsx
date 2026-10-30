@@ -12,6 +12,7 @@ import {
 } from "@/types/operations";
 import type { SourceInspection } from "@/server/services/source-inspector";
 import { useToast } from "@/components/providers/toast-provider";
+import { idempotentFetch } from "@/lib/http/idempotent-fetch";
 
 interface SourceMappingEditorProps {
   initialMapping: SheetMapping | null;
@@ -95,7 +96,7 @@ export function SourceMappingEditor({
 
     setIsSaving(true);
     try {
-      const res = await fetch("/api/admin/settings/mapping", {
+      const res = await idempotentFetch("/api/admin/settings/mapping", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(mappingPayload),

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, ArrowRight, Lock, Mail, Eye, EyeOff } from "lucide-react";
 import { HeadphoneZoneLogo } from "@/components/ui/headphone-zone-logo";
+import { idempotentFetch } from "@/lib/http/idempotent-fetch";
 
 function LoginForm() {
   const router = useRouter();
@@ -28,7 +29,7 @@ function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await idempotentFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

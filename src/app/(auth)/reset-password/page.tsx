@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Lock, ArrowRight, CheckCircle2, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { HeadphoneZoneLogo } from "@/components/ui/headphone-zone-logo";
+import { idempotentFetch } from "@/lib/http/idempotent-fetch";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -42,7 +43,7 @@ function ResetPasswordForm() {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch("/api/auth/reset-password", {
+      const res = await idempotentFetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, password }),

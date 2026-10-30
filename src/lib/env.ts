@@ -44,6 +44,10 @@ const serverSchema = z.object({
 
   CRON_SECRET: opt(z.string().min(16)),
   ERROR_WEBHOOK_URL: opt(z.url()),
+
+  UPSTASH_REDIS_REST_URL: opt(z.url()),
+  UPSTASH_REDIS_REST_TOKEN: opt(z.string().min(10)),
+  RATE_LIMIT_FAIL_CLOSED: withDefault(z.enum(["true", "false"]), "true"),
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;
@@ -146,6 +150,23 @@ export function getSmtpConfig(): SmtpConfig | null {
     from: e.EMAIL_FROM,
   };
 }
+
+export interface UpstashConfig {
+  url: string;
+  token: string;
+}
+
+/** Returns null when Upstash Redis is not configured (rate limiting falls back to durable Postgres storage). */
+export function getUpstashConfig(): UpstashConfig | null {
+  const e = getEnv();
+  if (!e.UPSTASH_REDIS_REST_URL || !e.UPSTASH_REDIS_REST_TOKEN) return null;
+  return {
+    url: e.UPSTASH_REDIS_REST_URL,
+    token: e.UPSTASH_REDIS_REST_TOKEN,
+  };
+}
+
+export const isRateLimitFailClosed = () => getEnv().RATE_LIMIT_FAIL_CLOSED === "true";
 
 export const appOrigin = () => new URL(getEnv().APP_URL).origin;
 export const isProduction = () => getEnv().NODE_ENV === "production";

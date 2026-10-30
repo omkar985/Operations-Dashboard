@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Settings, LogOut } from "lucide-react";
 import { HeadphoneZoneLogo } from "@/components/ui/headphone-zone-logo";
+import { idempotentFetch } from "@/lib/http/idempotent-fetch";
 import type { Freshness } from "@/server/services/dataset-service";
 import type { SessionUser } from "@/lib/auth/session";
 
@@ -29,7 +30,10 @@ export function Topbar({ user, freshness }: TopbarProps) {
 
   async function handleSignOut() {
     try {
-      await fetch("/api/auth/logout", { credentials: "include" });
+      await idempotentFetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
       router.push("/login");
       router.refresh();
     } catch {

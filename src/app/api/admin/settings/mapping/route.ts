@@ -8,8 +8,15 @@ import { getSheetsConfig } from "@/lib/env";
 import { log } from "@/lib/logger";
 import type { SheetMapping } from "@/types/operations";
 
-/** Saves the column mapping and immediately re-synchronises so dashboards reflect it. */
-export const PUT = apiRoute({ auth: "admin", schema: sheetMappingSchema }, async ({ body, user, ip }) => {
+export const PUT = apiRoute(
+  {
+    auth: "admin",
+    schema: sheetMappingSchema,
+    rateLimit: "adminMutation",
+    idempotent: true,
+    operation: "admin.settings.mapping",
+  },
+  async ({ body, user, ip }) => {
   await saveSheetMapping(user, body as SheetMapping, ip);
   invalidateDatasetCache();
   const willSync = Boolean(getSheetsConfig());

@@ -11,7 +11,13 @@ import { AppError } from "@/lib/errors";
 const STATES = ["all", "open", "closed", "overdue"] as const;
 
 /** CSV export of exactly what the Operations table shows for the same query string. */
-export const GET = apiRoute({ auth: "user" }, async ({ req }) => {
+export const GET = apiRoute(
+  {
+    auth: "user",
+    rateLimit: "generalApi",
+    operation: "operations.export",
+  },
+  async ({ req }) => {
   const data = await getDataset();
   if (data.kind !== "ready") throw new AppError("SOURCE_NOT_CONFIGURED", "No data is available to export yet.");
   const sp = req.nextUrl.searchParams;

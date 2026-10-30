@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { User, Lock, ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { HeadphoneZoneLogo } from "@/components/ui/headphone-zone-logo";
+import { idempotentFetch } from "@/lib/http/idempotent-fetch";
 
 function AcceptInvitationForm() {
   const router = useRouter();
@@ -42,7 +43,7 @@ function AcceptInvitationForm() {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch("/api/auth/accept-invitation", {
+      const res = await idempotentFetch("/api/auth/accept-invitation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, name, password }),

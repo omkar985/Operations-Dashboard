@@ -6,6 +6,7 @@ import { Lock, ShieldAlert, CheckCircle2, AlertCircle } from "lucide-react";
 import type { SessionUser } from "@/lib/auth/session";
 import { useToast } from "@/components/providers/toast-provider";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
+import { idempotentFetch } from "@/lib/http/idempotent-fetch";
 
 interface UserSettingsViewProps {
   user: SessionUser;
@@ -51,7 +52,7 @@ export function UserSettingsView({ user }: UserSettingsViewProps) {
     setIsChangingPassword(true);
 
     try {
-      const res = await fetch("/api/auth/change-password", {
+      const res = await idempotentFetch("/api/auth/change-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword, newPassword }),
@@ -78,7 +79,7 @@ export function UserSettingsView({ user }: UserSettingsViewProps) {
   async function handleSignOutEverywhere() {
     setIsSigningOut(true);
     try {
-      const res = await fetch("/api/auth/sign-out-everywhere", { method: "POST" });
+      const res = await idempotentFetch("/api/auth/sign-out-everywhere", { method: "POST" });
       if (res.ok) {
         toast.info("Signed Out Everywhere", "All active sessions have been terminated.");
         router.push("/login");

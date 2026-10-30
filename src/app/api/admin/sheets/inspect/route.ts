@@ -4,7 +4,13 @@ import { getSheetsConfig } from "@/lib/env";
 import { inspectSource } from "@/server/services/source-inspector";
 import { SheetsError } from "@/server/integrations/google-sheets";
 
-export const GET = apiRoute({ auth: "admin" }, async ({ req }) => {
+export const GET = apiRoute(
+  {
+    auth: "admin",
+    rateLimit: "generalApi",
+    operation: "admin.sheets.inspect",
+  },
+  async ({ req }) => {
   if (!getSheetsConfig()) throw new AppError("SOURCE_NOT_CONFIGURED", "Google Sheets credentials are not configured on this deployment.");
   const sp = req.nextUrl.searchParams;
   const headerRow = Number(sp.get("headerRow") ?? 1);
