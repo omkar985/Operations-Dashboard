@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { getEnv } from "@/lib/env";
+import { getEnv, getSheetsConfig } from "@/lib/env";
 import { AppError } from "@/lib/errors";
 import { getSetting, putSetting, writeAudit } from "@/server/repositories/platform";
 import { refreshSettingsSchema, sheetMappingSchema, thresholdsSchema } from "@/lib/validation/schemas";
@@ -25,7 +25,23 @@ export const getThresholds = cache(async (): Promise<Thresholds> => {
 
 export const getSheetMapping = cache(async (): Promise<SheetMapping | null> => {
   const stored = sheetMappingSchema.safeParse(await getSetting("sheet_mapping"));
-  return stored.success ? (stored.data as SheetMapping) : null;
+  if (stored.success) return stored.data as SheetMapping;
+
+  // Fallback to environment configured worksheet if present
+  const cfg = getSheetsConfig();
+  if (cfg?.defaultWorksheet) {
+    return {
+      worksheet: cfg.defaultWorksheet,
+      headerRow: 1,
+      dateFormat: "DMY",
+      columns: {
+        status: "status",
+      },
+      completedStatuses: ["Delivered", "Cancelled", "Closed", "Resolved", "Done", "Completed"],
+    };
+  }
+
+  return null;
 });
 
 export async function saveRefreshSettings(actor: SessionUser, value: RefreshSettings, ip: string) {

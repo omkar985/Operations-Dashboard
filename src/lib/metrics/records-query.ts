@@ -1,9 +1,27 @@
-import { isComplete, isOverdue, type DateRange, type MetricsConfig } from "@/lib/metrics/compute";
+import {
+  isComplete,
+  isOverdue,
+  isNotYetProcessed,
+  isNotYetDelivered,
+  type DateRange,
+  type MetricsConfig,
+} from "@/lib/metrics/compute";
 import type { OpsRecord } from "@/types/operations";
 
 /** Server-side search / filter / sort / pagination for the Operations table (pure, unit-tested). */
 
-export type SortKey = "row" | "id" | "title" | "status" | "priority" | "category" | "team" | "assignee" | "createdAt" | "dueAt" | "resolvedAt";
+export type SortKey =
+  | "row"
+  | "id"
+  | "title"
+  | "status"
+  | "priority"
+  | "category"
+  | "team"
+  | "assignee"
+  | "createdAt"
+  | "dueAt"
+  | "resolvedAt";
 
 export interface RecordQuery {
   q?: string;
@@ -12,8 +30,8 @@ export interface RecordQuery {
   category?: string;
   team?: string;
   assignee?: string;
-  /** all | open | closed | overdue */
-  state?: "all" | "open" | "closed" | "overdue";
+  /** all | open | closed | overdue | not_yet_processed | not_yet_delivered */
+  state?: "all" | "open" | "closed" | "overdue" | "not_yet_processed" | "not_yet_delivered";
   sort?: SortKey;
   dir?: "asc" | "desc";
   page?: number;
@@ -29,7 +47,19 @@ export interface RecordPage {
   pageCount: number;
 }
 
-export const SORT_KEYS: SortKey[] = ["row", "id", "title", "status", "priority", "category", "team", "assignee", "createdAt", "dueAt", "resolvedAt"];
+export const SORT_KEYS: SortKey[] = [
+  "row",
+  "id",
+  "title",
+  "status",
+  "priority",
+  "category",
+  "team",
+  "assignee",
+  "createdAt",
+  "dueAt",
+  "resolvedAt",
+];
 
 const cmp = (a: string | number | null, b: string | number | null) => {
   if (a === null && b === null) return 0;
@@ -50,6 +80,8 @@ export function filterRecords(records: OpsRecord[], query: RecordQuery, cfg: Met
     if (query.state === "open" && isComplete(r, cfg)) return false;
     if (query.state === "closed" && !isComplete(r, cfg)) return false;
     if (query.state === "overdue" && !isOverdue(r, cfg)) return false;
+    if (query.state === "not_yet_processed" && !isNotYetProcessed(r)) return false;
+    if (query.state === "not_yet_delivered" && !isNotYetDelivered(r)) return false;
     if (query.range && r.createdAt) {
       const t = Date.parse(r.createdAt);
       if (t < query.range.from.getTime() || t >= query.range.to.getTime()) return false;
@@ -57,7 +89,8 @@ export function filterRecords(records: OpsRecord[], query: RecordQuery, cfg: Met
       return false; // dated filter requested but this record has no created date
     }
     if (q) {
-      const hay = `${r.id ?? ""} ${r.title ?? ""} ${r.status ?? ""} ${r.priority ?? ""} ${r.category ?? ""} ${r.team ?? ""} ${r.assignee ?? ""}`.toLowerCase();
+      const rawText = r.raw ? Object.values(r.raw).join(" ") : "";
+      const hay = `${r.id ?? ""} ${r.title ?? ""} ${r.status ?? ""} ${r.priority ?? ""} ${r.category ?? ""} ${r.team ?? ""} ${r.assignee ?? ""} ${r.subsheet ?? ""} ${rawText}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -98,11 +131,17 @@ export function distinctValues(records: OpsRecord[], field: "status" | "priority
 
 /** CSV with spreadsheet-formula injection protection (cells starting with = + - @ are prefixed). */
 export function toCsv(records: OpsRecord[]): string {
-  const cols: (keyof OpsRecord)[] = ["row", "id", "title", "status", "priority", "category", "team", "assignee", "createdAt", "dueAt", "resolvedAt"];
-  const esc = (v: unknown) => {
-    let s = v === null || v === undefined ? "" : String(v);
-    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const cols = ['row', 'id', 'title', 'status', 'priority', 'category', 'team', 'assignee', 'createdAt', 'dueAt', 'resolvedAt', 'subsheet'] as const;
+  const escape = (val: string | number | null | undefined) => {
+    if (val === null || val === undefined) return "";
+    let s = String(val);
+    if (/^[=+\-@]/.test(s)) s = `'${s}`;
+    if (/[",\r\n]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
+    return s;
   };
-  return [cols.join(","), ...records.map((r) => cols.map((c) => esc(r[c])).join(","))].join("\r\n");
+  const lines = [cols.join(",")];
+  for (const r of records) {
+    lines.push(cols.map((c) => escape((r as unknown as Record<string, unknown>)[c] as string | number | null)).join(","));
+  }
+  return lines.join("\r\n");
 }

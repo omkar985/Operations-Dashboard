@@ -39,7 +39,7 @@ export const FIELD_META: Record<FieldKey, { label: string; description: string; 
 export type DateFormat = "ISO" | "DMY" | "MDY";
 
 export interface SheetMapping {
-  /** Worksheet (tab) title. */
+  /** Worksheet (tab) title or comma-separated list of titles. */
   worksheet: string;
   /** 1-based row that contains the column headers. */
   headerRow: number;
@@ -55,6 +55,8 @@ export interface SheetMapping {
 export interface OpsRecord {
   /** 1-based row number in the worksheet, for traceability back to the sheet. */
   row: number;
+  /** Originating worksheet tab name (when multiple subsheets are configured). */
+  subsheet?: string;
   id: string | null;
   title: string | null;
   status: string | null;
@@ -65,6 +67,8 @@ export interface OpsRecord {
   createdAt: string | null;
   dueAt: string | null;
   resolvedAt: string | null;
+  /** Preserved raw sheet columns (column header -> cell text) */
+  raw?: Record<string, string | null>;
 }
 
 export interface SyncWarning {

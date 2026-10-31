@@ -58,32 +58,31 @@ export function DetailDrawer({ record, onClose, open }: DetailDrawerProps) {
             className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[var(--card)] border-l border-[var(--line)] shadow-pop flex flex-col"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="drawer-title"
           >
             {/* Header */}
-            <div className="flex items-start justify-between p-5 border-b border-[var(--line-subtle)]">
-              <div>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="eyebrow flex items-center gap-1">
-                    <FileSpreadsheet className="w-3.5 h-3.5" />
-                    Sheet Row #{record.row}
+            <div className="p-5 border-b border-[var(--line-subtle)] flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-semibold text-[var(--muted)]">
+                    {record.id || `Row #${record.row}`}
                   </span>
-                  {record.status && <StatusBadge status={record.status} size="sm" />}
-                  {record.priority && <StatusBadge status={record.priority} variant="warning" size="sm" />}
+                  <StatusBadge status={record.status} />
+                  {record.subsheet && (
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium">
+                      <FileSpreadsheet className="w-3 h-3 text-slate-500" />
+                      {record.subsheet}
+                    </span>
+                  )}
                 </div>
-                <h2 id="drawer-title" className="text-base font-bold text-[var(--ink)] leading-snug">
-                  {record.title || (record.id ? `Record #${record.id}` : "Operational Record")}
+                <h2 className="text-base font-bold text-[var(--ink)] leading-snug">
+                  {record.title || "Untitled Record"}
                 </h2>
-                {record.id && record.title && (
-                  <p className="text-xs text-[var(--muted)] mono mt-0.5">ID: {record.id}</p>
-                )}
               </div>
-
               <button
                 type="button"
                 onClick={onClose}
-                className="btn btn-ghost btn-sm btn-icon text-[var(--muted)] hover:text-[var(--ink)] -mr-2"
-                aria-label="Close details"
+                className="btn btn-ghost btn-sm p-1 text-[var(--muted)] hover:text-[var(--ink)] rounded-md"
+                aria-label="Close record details"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -129,7 +128,7 @@ export function DetailDrawer({ record, onClose, open }: DetailDrawerProps) {
 
               {/* Timeline */}
               <div className="space-y-3">
-                <h3 className="eyebrow">Timeline & SLA</h3>
+                <h3 className="eyebrow">Timeline &amp; SLA</h3>
                 <div className="space-y-2.5 text-xs">
                   <div className="flex items-center justify-between p-2.5 rounded border border-[var(--line-subtle)] bg-[var(--card)]">
                     <div className="flex items-center gap-2 text-[var(--muted)]">
@@ -162,6 +161,33 @@ export function DetailDrawer({ record, onClose, open }: DetailDrawerProps) {
                   </div>
                 </div>
               </div>
+
+              {/* Raw Sheet Fields (e.g. Action taken, Delivered yes/no, etc.) */}
+              {record.raw && Object.keys(record.raw).length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="eyebrow flex items-center justify-between">
+                    <span>Sheet Fields</span>
+                    {record.subsheet && (
+                      <span className="text-[10px] text-[var(--muted)] font-mono">
+                        tab: {record.subsheet}
+                      </span>
+                    )}
+                  </h3>
+                  <div className="space-y-2 text-xs">
+                    {Object.entries(record.raw).map(([key, val]) => (
+                      <div
+                        key={key}
+                        className="flex items-start justify-between gap-4 p-2.5 rounded border border-[var(--line-subtle)] bg-[var(--raised)]"
+                      >
+                        <span className="text-[var(--muted)] shrink-0 font-medium">{key}</span>
+                        <span className="font-semibold text-[var(--ink)] text-right break-words max-w-[65%]">
+                          {val || "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footer */}

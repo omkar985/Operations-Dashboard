@@ -6,6 +6,8 @@ import {
   ageingBins,
   resolutionBins,
   needsAttention,
+  isNotYetProcessed,
+  isNotYetDelivered,
   type MetricsConfig,
   type DateRange,
 } from "@/lib/metrics/compute";
@@ -85,24 +87,181 @@ describe("Metrics Pure Function Calculations", () => {
   it("computes accurate instrument KPIs", () => {
     const kpis = computeKpis(sampleRecords, range, config);
 
+    const notYetProcKpi = kpis.find((k) => k.key === "not_yet_processed");
+    expect(notYetProcKpi).toBeDefined();
+    expect(notYetProcKpi?.label).toBe("Not Yet Processed");
+
+    const notYetDelivKpi = kpis.find((k) => k.key === "not_yet_delivered");
+    expect(notYetDelivKpi).toBeDefined();
+    expect(notYetDelivKpi?.label).toBe("Not Yet Delivered");
+
     const openKpi = kpis.find((k) => k.key === "open");
     expect(openKpi?.value).toBe(2); // REC-3 and REC-4
 
-    const createdKpi = kpis.find((k) => k.key === "created");
-    expect(createdKpi?.value).toBe(4); // all created within range
+    // Removed KPI cards should not be in the list
+    expect(kpis.find((k) => k.key === "created")).toBeUndefined();
+    expect(kpis.find((k) => k.key === "resolved")).toBeUndefined();
+    expect(kpis.find((k) => k.key === "overdue")).toBeUndefined();
+    expect(kpis.find((k) => k.key === "sla")).toBeUndefined();
+    expect(kpis.find((k) => k.key === "ttr")).toBeUndefined();
+  });
 
-    const resolvedKpi = kpis.find((k) => k.key === "resolved");
-    expect(resolvedKpi?.value).toBe(2); // REC-1 and REC-2
+  it("filters Not Yet Processed accurately based on Action taken blank and status not cancelled", () => {
+    const unproc1: OpsRecord = {
+      row: 2,
+      id: "ORD-1",
+      title: "Order 1",
+      status: "New",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: { "Action taken": "", status: "New" },
+    };
+    const unproc2: OpsRecord = {
+      row: 3,
+      id: "ORD-2",
+      title: "Order 2",
+      status: "Pending",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: { "Action taken": null, status: "Pending" },
+    };
+    const cancelled: OpsRecord = {
+      row: 4,
+      id: "ORD-3",
+      title: "Order 3",
+      status: "Cancelled",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: { "Action taken": "", status: "Cancelled by Customer" },
+    };
+    const processed: OpsRecord = {
+      row: 5,
+      id: "ORD-4",
+      title: "Order 4",
+      status: "Processing",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: { "Action taken": "Called customer to confirm", status: "Processing" },
+    };
 
-    const overdueKpi = kpis.find((k) => k.key === "overdue");
-    expect(overdueKpi?.value).toBe(1); // REC-3
+    expect(isNotYetProcessed(unproc1)).toBe(true);
+    expect(isNotYetProcessed(unproc2)).toBe(true);
+    expect(isNotYetProcessed(cancelled)).toBe(false);
+    expect(isNotYetProcessed(processed)).toBe(false);
+  });
 
-    const slaKpi = kpis.find((k) => k.key === "sla");
-    expect(slaKpi?.value).toBe(50); // 1 out of 2 resolved items on time
+  it("filters Not Yet Delivered accurately based on Delivered yes/no not yes and status not Delivered/RTO/Returns", () => {
+    const notDelivered1: OpsRecord = {
+      row: 2,
+      id: "ORD-1",
+      title: "Order 1",
+      status: "In Transit",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: { "Delivered yes/no)": "No", status: "In Transit" },
+    };
+    const notDelivered2: OpsRecord = {
+      row: 3,
+      id: "ORD-2",
+      title: "Order 2",
+      status: "Dispatched",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: { "Delivered (yes/no)": "", status: "Dispatched" },
+    };
+    const alreadyDelivered1: OpsRecord = {
+      row: 4,
+      id: "ORD-3",
+      title: "Order 3",
+      status: "Delivered",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: { "Delivered yes/no)": "Yes", status: "Delivered" },
+    };
+    const alreadyDelivered2: OpsRecord = {
+      row: 5,
+      id: "ORD-4",
+      title: "Order 4",
+      status: "Delivered",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: { "Delivered yes/no)": "No", status: "Delivered" },
+    };
+    const rto: OpsRecord = {
+      row: 6,
+      id: "ORD-5",
+      title: "Order 5",
+      status: "RTO Initiated",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: { "Delivered yes/no)": "No", status: "RTO Initiated" },
+    };
+    const returns: OpsRecord = {
+      row: 7,
+      id: "ORD-6",
+      title: "Order 6",
+      status: "Customer Returns",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: { "Delivered yes/no)": "No", status: "Customer Returns" },
+    };
 
-    const ttrKpi = kpis.find((k) => k.key === "ttr");
-    // REC-1: 24h, REC-2: 72h. Median of [24, 72] = 48 hours
-    expect(ttrKpi?.value).toBe(48);
+    expect(isNotYetDelivered(notDelivered1)).toBe(true);
+    expect(isNotYetDelivered(notDelivered2)).toBe(true);
+    expect(isNotYetDelivered(alreadyDelivered1)).toBe(false);
+    expect(isNotYetDelivered(alreadyDelivered2)).toBe(false);
+    expect(isNotYetDelivered(rto)).toBe(false);
+    expect(isNotYetDelivered(returns)).toBe(false);
   });
 
   it("builds daily/weekly trend series without synthetic numbers", () => {

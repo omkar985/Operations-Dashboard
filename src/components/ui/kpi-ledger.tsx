@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Clock,
   Layers,
+  Truck,
 } from "lucide-react";
 
 interface KpiLedgerProps {
@@ -20,6 +21,8 @@ interface KpiLedgerProps {
 }
 
 const KPI_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  not_yet_processed: AlertCircle,
+  not_yet_delivered: Truck,
   open: Folder,
   created: Layers,
   resolved: CheckCircle2,
@@ -29,7 +32,9 @@ const KPI_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 const KPI_ICON_STYLES: Record<string, string> = {
-  open: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20",
+  not_yet_processed: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20",
+  not_yet_delivered: "text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
+  open: "text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/20",
   created: "text-sky-600 dark:text-sky-400 bg-sky-500/10 border-sky-500/20",
   resolved: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
   overdue: "text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20",
@@ -50,6 +55,8 @@ export function KpiLedger({ kpis, className = "" }: KpiLedgerProps) {
   };
 
   const getSparklineColor = (kpi: Kpi, isLead: boolean) => {
+    if (kpi.key === "not_yet_processed") return "#F59E0B";
+    if (kpi.key === "not_yet_delivered") return "#6366F1";
     if (isLead) return "#0EA5E9";
     if (kpi.key === "overdue") return "#EF4444";
     if (kpi.key === "created") return "#0EA5E9";
@@ -59,7 +66,7 @@ export function KpiLedger({ kpis, className = "" }: KpiLedgerProps) {
   };
 
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5 ${className}`}>
+    <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 ${className}`}>
       {kpis.map((kpi, idx) => {
         const isLead = idx === 0;
         const Icon = KPI_ICONS[kpi.key] || TrendingUp;
@@ -99,27 +106,25 @@ export function KpiLedger({ kpis, className = "" }: KpiLedgerProps) {
               {kpi.available && kpi.sparkline && kpi.sparkline.length > 1 && (
                 <Sparkline
                   data={kpi.sparkline}
-                  color={getSparklineColor(kpi, isLead)}
+                  width={68}
                   height={26}
-                  width={58}
+                  color={getSparklineColor(kpi, isLead)}
                 />
               )}
             </div>
 
-            {/* Footer: Trend / Alert */}
-            <div className="pt-2 border-t border-[var(--line-subtle)] min-h-[26px] flex items-center">
+            {/* Footer: Trend Delta vs Prior Period or Missing Field warning */}
+            <div className="pt-2 border-t border-[var(--line-subtle)]/60 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
               {kpi.available ? (
-                <TrendIndicator
-                  deltaPct={kpi.deltaPct}
-                  good={kpi.good}
-                  unit={kpi.unit === "percent" ? "pp" : "%"}
-                />
+                <>
+                  <TrendIndicator deltaPct={kpi.deltaPct} good={kpi.good} />
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-auto truncate">
+                    vs. prior
+                  </span>
+                </>
               ) : (
-                <div
-                  className="flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 font-medium"
-                  title={`Missing mapped column(s): ${kpi.missing.join(", ")}`}
-                >
-                  <AlertCircle className="w-3 h-3 shrink-0" />
+                <div className="flex items-center gap-1 text-slate-400 text-[10.5px]">
+                  <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" />
                   <span className="truncate">Requires: {kpi.missing.join(", ")}</span>
                 </div>
               )}

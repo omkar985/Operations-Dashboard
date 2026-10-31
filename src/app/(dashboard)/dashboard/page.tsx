@@ -3,23 +3,11 @@ import { AlertTriangle, ArrowRight, Settings2, RefreshCw } from "lucide-react";
 import { getDataset } from "@/server/services/dataset-service";
 import { getThresholds } from "@/server/services/settings-service";
 import { parseRange } from "@/lib/metrics/range";
-import {
-  computeKpis,
-  buildTrend,
-  breakdownBy,
-  needsAttention,
-  type MetricsConfig,
-} from "@/lib/metrics/compute";
+import { computeKpis, type MetricsConfig } from "@/lib/metrics/compute";
 import type { FieldKey } from "@/types/operations";
 import { KpiLedger } from "@/components/ui/kpi-ledger";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
-import { ChartCard } from "@/components/ui/chart-card";
-import { TrendChart } from "@/components/charts/trend-chart";
-import { BreakdownBarChart } from "@/components/charts/breakdown-bar-chart";
-import { DonutChart } from "@/components/charts/donut-chart";
 import { EmptyState } from "@/components/ui/empty-state";
-import { AttentionSection } from "@/components/dashboard/attention-section";
-
 import { LiveRefreshHeader } from "@/components/dashboard/live-refresh-header";
 
 interface DashboardPageProps {
@@ -106,16 +94,6 @@ export default async function DashboardPage(props: DashboardPageProps) {
   };
 
   const kpis = computeKpis(dataset.records, parsedRange, metricsConfig);
-  const trend = buildTrend(dataset.records, parsedRange, metricsConfig);
-  const teamBreakdown = breakdownBy(dataset.records, "team", parsedRange, metricsConfig, 6);
-  const statusBreakdown = breakdownBy(dataset.records, "status", parsedRange, metricsConfig, 6);
-  const priorityBreakdown = breakdownBy(dataset.records, "priority", parsedRange, metricsConfig, 5);
-  const attentionItems = needsAttention(dataset.records, metricsConfig, 8);
-
-  const statusDonutData = (statusBreakdown || []).map((s) => ({
-    name: s.label,
-    value: s.total,
-  }));
 
   const exportUrl = `/api/operations/export?range=${encodeURIComponent(
     parsedRange.key
@@ -159,52 +137,8 @@ export default async function DashboardPage(props: DashboardPageProps) {
         </div>
       )}
 
-      {/* 1. Continuous Instrument KPI Strip */}
+      {/* KPI Cards */}
       <KpiLedger kpis={kpis} />
-
-      {/* 2. Visual Analytics Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <ChartCard
-          title="Operational Inflow vs Resolution"
-          subtitle="New incoming records, completions, and cumulative backlog over time"
-          className="lg:col-span-2"
-        >
-          <TrendChart data={trend} height={310} showBacklog={true} />
-        </ChartCard>
-
-        <ChartCard
-          title="Workload by Team"
-          subtitle="Total, open, and overdue item distribution"
-          className="lg:col-span-1"
-        >
-          <BreakdownBarChart data={teamBreakdown} height={310} horizontal={true} />
-        </ChartCard>
-      </div>
-
-      {/* 3. Status & Priority Proportions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <ChartCard
-          title="Status Breakdown"
-          subtitle="Proportion of items in each lifecycle state"
-        >
-          <DonutChart
-            data={statusDonutData}
-            height={270}
-            centerText={`${kpis.find((k) => k.key === "open")?.value?.toLocaleString() ?? "—"}`}
-            subText="Open items"
-          />
-        </ChartCard>
-
-        <ChartCard
-          title="Priority Volume"
-          subtitle="Open records categorized by operational severity"
-        >
-          <BreakdownBarChart data={priorityBreakdown} height={270} horizontal={false} />
-        </ChartCard>
-      </div>
-
-      {/* 4. Attention Needed Table */}
-      <AttentionSection items={attentionItems} />
     </div>
   );
 }

@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   TableProperties,
-  BarChart3,
   Settings,
   Users,
   UserPlus,
@@ -35,8 +34,7 @@ interface NavItem {
 const OPERATIONS_NAV: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { label: "Operations Ledger", href: "/operations", icon: TableProperties },
-  { label: "Analytics & SLA", href: "/reports", icon: BarChart3 },
-  { label: "My Preferences", href: "/settings", icon: Settings },
+    { label: "My Preferences", href: "/settings", icon: Settings },
 ];
 
 const ADMIN_NAV: NavItem[] = [

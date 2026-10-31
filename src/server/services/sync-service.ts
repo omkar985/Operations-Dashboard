@@ -20,7 +20,7 @@ import {
 import { appOrigin } from "@/lib/env";
 import { buildAppUrl } from "@/lib/email/links";
 import { invalidateDatasetCache } from "@/server/services/dataset-service";
-import type { SyncWarning } from "@/types/operations";
+import type { OpsRecord, SyncWarning } from "@/types/operations";
 import type { SessionUser } from "@/lib/auth/session";
 
 export type SyncTrigger = "cron" | "manual" | "lazy";
@@ -40,7 +40,7 @@ const safeMessage = (err: unknown): { code: string; message: string } => {
 };
 
 /**
- * Synchronises the configured worksheet into a new snapshot.
+ * Synchronises the configured worksheet(s) into a new snapshot.
  *
  *  - never overlaps: `begin_sync_run` takes a database-level lease (unique partial index);
  *  - every attempt (success or failure) is recorded in data_sync_runs;
@@ -56,43 +56,71 @@ export async function runSync(opts: { trigger: SyncTrigger; actor?: SessionUser 
 
   try {
     const info = await getSpreadsheetInfo();
-    const ws = info.worksheets.find((w) => w.title === mapping.worksheet) ?? info.worksheets.find((w) => w.title.toLowerCase() === mapping.worksheet.toLowerCase());
-    if (!ws) {
-      throw new AppError("MAPPING_INVALID", `Worksheet “${mapping.worksheet}” does not exist in “${info.title}”. Available: ${info.worksheets.map((w) => w.title).join(", ") || "none"}.`);
+    const cfg = getSheetsConfig();
+
+    // Support single worksheet or multiple subsheets (comma-separated or configured in env)
+    const sheetTitles = mapping.worksheet.includes(",")
+      ? mapping.worksheet.split(",").map((s) => s.trim()).filter(Boolean)
+      : (cfg?.worksheets && cfg.worksheets.length > 1 ? cfg.worksheets : [mapping.worksheet]);
+
+    const targetWorksheets = sheetTitles
+      .map((name) => info.worksheets.find((w) => w.title === name) ?? info.worksheets.find((w) => w.title.toLowerCase() === name.toLowerCase()))
+      .filter((w): w is NonNullable<typeof w> => Boolean(w));
+
+    if (targetWorksheets.length === 0) {
+      throw new AppError(
+        "MAPPING_INVALID",
+        `Worksheet(s) [${sheetTitles.join(", ")}] do not exist in “${info.title}”. Available: ${info.worksheets.map((w) => w.title).join(", ") || "none"}.`
+      );
     }
 
-    const read = await readWorksheet(ws, mapping.headerRow);
-    const mapped = mapRows(read.rows, read.headers, mapping, mapping.headerRow + 1);
-    const warnings = [...mapped.warnings];
-    if (read.truncated) warnings.push({ code: "ROW_LIMIT", message: "The worksheet exceeds the 100,000 row import limit; later rows were not imported." });
+    let allRecords: OpsRecord[] = [];
+    let allRowsRead = 0;
+    let allRowsBlank = 0;
+    const warnings: SyncWarning[] = [];
+
+    for (const ws of targetWorksheets) {
+      const read = await readWorksheet(ws, mapping.headerRow);
+      const mapped = mapRows(read.rows, read.headers, mapping, mapping.headerRow + 1, ws.title);
+      allRowsRead += mapped.rowsRead;
+      allRowsBlank += mapped.rowsBlank;
+      allRecords = allRecords.concat(mapped.records);
+      warnings.push(...mapped.warnings);
+      if (read.truncated) {
+        warnings.push({
+          code: "ROW_LIMIT",
+          message: `Worksheet “${ws.title}” exceeds the 100,000 row import limit; later rows were not imported.`,
+        });
+      }
+    }
 
     const mappedColumns = Object.keys(mapping.columns).length;
-    const missingCount = mapped.warnings.filter((w) => w.code === "MISSING_COLUMN").length;
-    if (missingCount >= mappedColumns) {
-      throw new AppError("MAPPING_INVALID", "None of the mapped column headers were found in the worksheet. Re-check the mapping against the sheet's header row.");
+    const missingCount = warnings.filter((w) => w.code === "MISSING_COLUMN").length;
+    if (mappedColumns > 0 && missingCount >= mappedColumns * targetWorksheets.length) {
+      throw new AppError("MAPPING_INVALID", "None of the mapped column headers were found in the worksheet(s). Re-check the mapping against the sheet's header row.");
     }
-    if (mapped.records.length === 0 && mapped.rowsRead > 0) {
+    if (allRecords.length === 0 && allRowsRead > 0) {
       warnings.push({ code: "NO_MAPPED_VALUES", message: "Rows were read but none contained values in the mapped columns." });
     }
 
     const snapshotId = await insertSnapshot({
       runId: run.id,
-      rowCount: mapped.records.length,
+      rowCount: allRecords.length,
       mappingHash: mappingFingerprint(mapping),
-      records: mapped.records,
+      records: allRecords,
       warnings,
     });
     await finishSyncRun(run.id, {
       status: "succeeded",
-      rowsRead: mapped.rowsRead,
-      rowsValid: mapped.records.length,
-      rowsSkipped: mapped.rowsBlank,
+      rowsRead: allRowsRead,
+      rowsValid: allRecords.length,
+      rowsSkipped: allRowsBlank,
       snapshotId,
     });
     invalidateDatasetCache();
     await pruneSnapshots(3).catch((e) => log.warn("snapshot_prune_failed", { error: e }));
-    log.info("sync_succeeded", { runId: run.id, trigger: opts.trigger, rows: mapped.records.length, warnings: warnings.length });
-    return { runId: run.id, rowsRead: mapped.rowsRead, rowsValid: mapped.records.length, rowsSkipped: mapped.rowsBlank, warnings };
+    log.info("sync_succeeded", { runId: run.id, trigger: opts.trigger, rows: allRecords.length, warnings: warnings.length });
+    return { runId: run.id, rowsRead: allRowsRead, rowsValid: allRecords.length, rowsSkipped: allRowsBlank, warnings };
   } catch (err) {
     const { code, message } = safeMessage(err);
     await finishSyncRun(run.id, { status: "failed", errorCode: code, errorMessage: message }).catch((e) => log.error("sync_finish_failed", { error: e }));

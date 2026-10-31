@@ -10,15 +10,38 @@ interface LiveRefreshHeaderProps {
   exportUrl: string;
 }
 
+const REFRESH_INTERVAL_SECONDS = 120;
+
 export function LiveRefreshHeader({ exportUrl }: LiveRefreshHeaderProps) {
   const router = useRouter();
   const toast = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(120);
+  const [secondsLeft, setSecondsLeft] = useState(REFRESH_INTERVAL_SECONDS);
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    setLastUpdated(
+      new Date().toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      })
+    );
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSecondsLeft((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // When timer reaches 0, trigger page data refresh cleanly outside of state updater
+  useEffect(() => {
+    if (secondsLeft === 0) {
+      router.refresh();
       setLastUpdated(
         new Date().toLocaleTimeString("en-US", {
           hour: "2-digit",
@@ -27,31 +50,9 @@ export function LiveRefreshHeader({ exportUrl }: LiveRefreshHeaderProps) {
           hour12: false,
         })
       );
-    }, 0);
-
-    const interval = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          router.refresh();
-          setLastUpdated(
-            new Date().toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-              hour12: false,
-            })
-          );
-          return 120;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      clearTimeout(timer);
-      clearInterval(interval);
-    };
-  }, [router]);
+      setSecondsLeft(REFRESH_INTERVAL_SECONDS);
+    }
+  }, [secondsLeft, router]);
 
   async function handleManualRefresh() {
     if (isRefreshing) return;
@@ -70,7 +71,7 @@ export function LiveRefreshHeader({ exportUrl }: LiveRefreshHeaderProps) {
             ? `Synchronized ${body.data.recordCount.toLocaleString()} operational records.`
             : "Operations ledger synchronized."
         );
-        setSecondsLeft(120);
+        setSecondsLeft(REFRESH_INTERVAL_SECONDS);
         setLastUpdated(
           new Date().toLocaleTimeString("en-US", {
             hour: "2-digit",

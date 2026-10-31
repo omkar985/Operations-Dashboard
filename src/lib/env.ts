@@ -29,6 +29,8 @@ const serverSchema = z.object({
   PASSWORD_RESET_TTL_MINUTES: withDefault(intIn(5, 24 * 60), 60),
 
   GOOGLE_SHEETS_SPREADSHEET_ID: opt(z.string().min(10)),
+  GOOGLE_SHEETS_WORKSHEET: opt(z.string().min(1)),
+  GOOGLE_SHEETS_WORKSHEETS: opt(z.string().min(1)),
   GOOGLE_SERVICE_ACCOUNT_EMAIL: opt(z.email()),
   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: opt(z.string().min(100)),
 
@@ -112,6 +114,8 @@ export interface SheetsConfig {
   spreadsheetId: string;
   clientEmail: string;
   privateKey: string;
+  defaultWorksheet?: string;
+  worksheets?: string[];
 }
 
 /** Returns null when Google Sheets is not configured (the app then shows a connection state). */
@@ -120,11 +124,20 @@ export function getSheetsConfig(): SheetsConfig | null {
   if (!e.GOOGLE_SHEETS_SPREADSHEET_ID || !e.GOOGLE_SERVICE_ACCOUNT_EMAIL || !e.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
     return null;
   }
+  const defaultWs =
+    e.GOOGLE_SHEETS_WORKSHEET ||
+    (e.GOOGLE_SHEETS_WORKSHEETS ? e.GOOGLE_SHEETS_WORKSHEETS.split(",")[0]?.trim() : undefined);
+  const worksheets = e.GOOGLE_SHEETS_WORKSHEETS
+    ? e.GOOGLE_SHEETS_WORKSHEETS.split(",").map((s) => s.trim()).filter(Boolean)
+    : (e.GOOGLE_SHEETS_WORKSHEET ? [e.GOOGLE_SHEETS_WORKSHEET] : undefined);
+
   return {
     spreadsheetId: e.GOOGLE_SHEETS_SPREADSHEET_ID,
     clientEmail: e.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     // .env files commonly hold the PEM with literal "\n" sequences and surrounding quotes.
     privateKey: e.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/^"|"$/g, "").replace(/\\n/g, "\n"),
+    defaultWorksheet: defaultWs,
+    worksheets,
   };
 }
 

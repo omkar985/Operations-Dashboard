@@ -17,18 +17,20 @@ import { idempotentFetch } from "@/lib/http/idempotent-fetch";
 interface SourceMappingEditorProps {
   initialMapping: SheetMapping | null;
   initialInspection: SourceInspection | null;
+  defaultWorksheet?: string;
 }
 
 export function SourceMappingEditor({
   initialMapping,
   initialInspection,
+  defaultWorksheet,
 }: SourceMappingEditorProps) {
   const router = useRouter();
   const toast = useToast();
 
   const [inspection, setInspection] = useState<SourceInspection | null>(initialInspection);
   const [worksheet, setWorksheet] = useState<string>(
-    initialMapping?.worksheet || initialInspection?.worksheets[0]?.title || ""
+    initialMapping?.worksheet || defaultWorksheet || initialInspection?.worksheets[0]?.title || ""
   );
   const [headerRow, setHeaderRow] = useState<number>(initialMapping?.headerRow ?? 1);
   const [dateFormat, setDateFormat] = useState<DateFormat>(initialMapping?.dateFormat ?? "DMY");

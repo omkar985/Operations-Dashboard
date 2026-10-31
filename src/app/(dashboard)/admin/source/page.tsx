@@ -9,7 +9,8 @@ import { AlertCircle } from "lucide-react";
 export default async function AdminSourcePage() {
   await requireAdminPage();
   const mapping = await getSheetMapping();
-  const hasConfig = Boolean(getSheetsConfig());
+  const sheetsConfig = getSheetsConfig();
+  const hasConfig = Boolean(sheetsConfig);
 
   if (!hasConfig) {
     return (
@@ -27,7 +28,7 @@ export default async function AdminSourcePage() {
   let inspection: SourceInspection | null = null;
   try {
     inspection = await inspectSource({
-      worksheet: mapping?.worksheet,
+      worksheet: mapping?.worksheet || sheetsConfig?.defaultWorksheet,
       headerRow: mapping?.headerRow,
     });
   } catch {
@@ -47,6 +48,7 @@ export default async function AdminSourcePage() {
       <SourceMappingEditor
         initialMapping={mapping}
         initialInspection={inspection}
+        defaultWorksheet={sheetsConfig?.defaultWorksheet}
       />
     </div>
   );

@@ -35,13 +35,25 @@ const SHEETS_EPOCH_MS = Date.UTC(1899, 11, 30);
 /** Converts a Sheets/Excel serial date number to an ISO string (interpreted as UTC wall time). */
 export function serialToIso(serial: number): string | null {
   if (!Number.isFinite(serial) || serial < 1 || serial > 120000) return null;
-  const ms = SHEETS_EPOCH_MS + Math.round(serial * 86_400_000 / 1000) * 1000;
+  const ms = SHEETS_EPOCH_MS + Math.round((serial * 86_400_000) / 1000) * 1000;
   const d = new Date(ms);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 const MONTHS: Record<string, number> = {
-  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
+  jan: 1,
+  feb: 2,
+  mar: 3,
+  apr: 4,
+  may: 5,
+  jun: 6,
+  jul: 7,
+  aug: 8,
+  sep: 9,
+  sept: 9,
+  oct: 10,
+  nov: 11,
+  dec: 12,
 };
 
 function buildUtc(y: number, mo: number, d: number, h = 0, mi = 0, s = 0): string | null {
@@ -182,6 +194,7 @@ export function mapRows(
   headers: CellValue[],
   mapping: SheetMapping,
   firstDataRow: number,
+  subsheetName?: string,
 ): MapResult {
   const { indices, missing, duplicates } = resolveColumns(headers, mapping.columns);
   const warnings: SyncWarning[] = [];
@@ -209,8 +222,18 @@ export function mapRows(
       return iso;
     };
 
+    // Preserve all raw non-empty headers & values
+    const rawData: Record<string, string | null> = {};
+    headers.forEach((h, colIdx) => {
+      if (h !== null && h !== undefined && h !== "") {
+        const colTitle = String(h).trim();
+        rawData[colTitle] = toText(row[colIdx]);
+      }
+    });
+
     const rec: OpsRecord = {
       row: firstDataRow + i,
+      subsheet: subsheetName,
       id: text("id"),
       title: text("title"),
       status: text("status"),
@@ -221,13 +244,18 @@ export function mapRows(
       createdAt: date("createdAt"),
       dueAt: date("dueAt"),
       resolvedAt: date("resolvedAt"),
+      raw: rawData,
     };
 
-    const hasAny = FIELD_KEYS.some((k) => {
+    const hasAnyMapped = FIELD_KEYS.some((k) => {
       const idx = indices[k];
       return idx !== undefined && toText(row[idx]) !== null;
     });
-    if (!hasAny) {
+
+    // Also consider row non-blank if any raw column has content
+    const hasAnyRaw = Object.values(rawData).some((v) => v !== null && v !== "");
+
+    if (!hasAnyMapped && !hasAnyRaw) {
       blank++;
       return;
     }
@@ -256,11 +284,34 @@ export function mappingFingerprint(mapping: SheetMapping): string {
   return (h >>> 0).toString(16).padStart(8, "0");
 }
 
+/** Looks up a column value from record's raw fields by name with case/punctuation tolerance. */
+export function getRecordCol(r: OpsRecord, colName: string): string | null {
+  if (!r.raw) return null;
+  const normTarget = normalizeHeader(colName);
+  // 1. Direct normalized match
+  for (const [k, v] of Object.entries(r.raw)) {
+    if (normalizeHeader(k) === normTarget) return v;
+  }
+  // 2. Alphanumeric match (ignoring parentheses, slashes, punctuation, spaces)
+  const cleanTarget = normTarget.replace(/[^a-z0-9]/g, "");
+  if (cleanTarget) {
+    for (const [k, v] of Object.entries(r.raw)) {
+      if (normalizeHeader(k).replace(/[^a-z0-9]/g, "") === cleanTarget) return v;
+    }
+  }
+  return null;
+}
+
+/** Returns the status of the record from mapped field or raw columns. */
+export function getRecordStatus(r: OpsRecord): string {
+  return r.status ?? getRecordCol(r, "status") ?? getRecordCol(r, "order status") ?? "";
+}
+
 /** Header aliases used ONLY to pre-fill suggestions in the admin UI. Admins must confirm them. */
 const ALIASES: Record<FieldKey, string[]> = {
-  id: ["id", "ticket id", "ticket no", "ticket number", "task id", "reference", "ref", "order id", "case id", "#"],
-  title: ["title", "subject", "summary", "name", "description", "task", "issue"],
-  status: ["status", "state", "stage"],
+  id: ["id", "ticket id", "ticket no", "ticket number", "task id", "reference", "ref", "order id", "order no", "order #", "case id", "#"],
+  title: ["title", "subject", "summary", "name", "description", "task", "issue", "customer name", "customer"],
+  status: ["status", "state", "stage", "order status", "delivery status"],
   priority: ["priority", "severity", "urgency"],
   category: ["category", "type", "queue", "issue type", "department", "group"],
   team: ["team", "squad", "owner team", "assigned team"],

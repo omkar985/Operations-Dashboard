@@ -1,4 +1,5 @@
 import type { FieldKey, OpsRecord } from "@/types/operations";
+import { getRecordCol, getRecordStatus } from "@/lib/google-sheets/mapping";
 
 /**
  * Operational metrics — pure functions over normalised records.
@@ -34,8 +35,9 @@ export function hasCompletionInfo(cfg: MetricsConfig): boolean {
 
 export function isComplete(r: OpsRecord, cfg: MetricsConfig): boolean {
   if (r.resolvedAt) return true;
-  if (r.status && cfg.completedStatuses.length) {
-    const s = r.status.toLowerCase();
+  const statusStr = getRecordStatus(r);
+  if (statusStr && cfg.completedStatuses.length) {
+    const s = statusStr.toLowerCase();
     return cfg.completedStatuses.some((c) => c.toLowerCase() === s);
   }
   return false;
@@ -44,6 +46,30 @@ export function isComplete(r: OpsRecord, cfg: MetricsConfig): boolean {
 export function isOverdue(r: OpsRecord, cfg: MetricsConfig): boolean {
   if (!r.dueAt) return false;
   return !isComplete(r, cfg) && ms(r.dueAt) < cfg.now.getTime();
+}
+
+/**
+ * Filter 1: Not Yet Processed
+ * Criteria: "Action taken" is Blank AND status does not contain "cancelled"
+ */
+export function isNotYetProcessed(r: OpsRecord): boolean {
+  const actionTaken = getRecordCol(r, "Action taken");
+  const isActionBlank = !actionTaken || actionTaken.trim() === "";
+  const status = getRecordStatus(r).toLowerCase();
+  const notCancelled = !status.includes("cancel");
+  return isActionBlank && notCancelled;
+}
+
+/**
+ * Filter 2: Not Yet Delivered
+ * Criteria: "Delivered yes/no)" column is not set to "Yes" AND "status" column does not contain "Delivered", "RTO", or "Returns"
+ */
+export function isNotYetDelivered(r: OpsRecord): boolean {
+  const delivered = getRecordCol(r, "Delivered yes/no)");
+  const isDeliveredNotYes = (delivered ?? "").trim().toLowerCase() !== "yes";
+  const status = getRecordStatus(r).toLowerCase();
+  const notDeliveredOrRtoOrReturns = !/delivered|rto|return/i.test(status);
+  return isDeliveredNotYes && notDeliveredOrRtoOrReturns;
 }
 
 const within = (iso: string | null, range: DateRange) => {
@@ -65,7 +91,16 @@ export function median(values: number[]): number | null {
 
 // ----------------------------------------------------------------------------- KPIs
 
-export type KpiKey = "open" | "created" | "resolved" | "overdue" | "sla" | "ttr";
+export type KpiKey =
+  | "not_yet_processed"
+  | "not_yet_delivered"
+  | "open"
+  | "created"
+  | "resolved"
+  | "overdue"
+  | "sla"
+  | "ttr";
+
 export type KpiUnit = "count" | "percent" | "hours";
 
 export interface Kpi {
@@ -89,7 +124,10 @@ export interface Kpi {
   target?: number;
 }
 
-function mk(partial: Omit<Kpi, "available" | "missing" | "previous" | "deltaPct" | "sparkline" | "value"> & Partial<Kpi>, cfg: MetricsConfig): Kpi {
+function mk(
+  partial: Omit<Kpi, "available" | "missing" | "previous" | "deltaPct" | "sparkline" | "value"> & Partial<Kpi>,
+  cfg: MetricsConfig,
+): Kpi {
   const missing = partial.requires.filter((f) => !cfg.mapped.has(f));
   return { value: null, previous: null, deltaPct: null, sparkline: [], available: missing.length === 0, missing, ...partial };
 }
@@ -101,8 +139,68 @@ export function computeKpis(records: OpsRecord[], range: DateRange, cfg: Metrics
   const prev = previousRange(range);
   const completionNeeded: FieldKey[] = cfg.mapped.has("resolvedAt") ? ["resolvedAt"] : ["status"];
   const trend = buildTrend(records, range, cfg);
+  const starts = bucketStarts(range);
+  const step = granularityFor(range) === "day" ? DAY : 7 * DAY;
 
-  // Open now
+  // 1. Not Yet Processed (Requested KPI 1)
+  const notYetProcessed = mk(
+    {
+      key: "not_yet_processed",
+      label: "Not Yet Processed",
+      definition: 'Orders where "Action taken" is blank and status does not contain "cancelled".',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg,
+  );
+  notYetProcessed.available = true;
+  notYetProcessed.value = records.filter(isNotYetProcessed).length;
+  if (cfg.mapped.has("createdAt")) {
+    const curInRange = records.filter((r) => within(r.createdAt, range) && isNotYetProcessed(r)).length;
+    const prevInRange = records.filter((r) => within(r.createdAt, prev) && isNotYetProcessed(r)).length;
+    notYetProcessed.previous = prevInRange;
+    notYetProcessed.deltaPct = pctDelta(curInRange, prevInRange);
+    notYetProcessed.sparkline = starts.map((s) => {
+      const lo = Math.max(s.getTime(), range.from.getTime());
+      const hi = Math.min(s.getTime() + step, range.to.getTime());
+      return records.filter((r) => {
+        const t = ms(r.createdAt);
+        return !Number.isNaN(t) && t >= lo && t < hi && isNotYetProcessed(r);
+      }).length;
+    });
+  }
+
+  // 2. Not yet Delivered (Requested KPI 2)
+  const notYetDelivered = mk(
+    {
+      key: "not_yet_delivered",
+      label: "Not Yet Delivered",
+      definition: 'Orders where "Delivered yes/no)" is not "Yes" and status does not contain "Delivered", "RTO", or "Returns".',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg,
+  );
+  notYetDelivered.available = true;
+  notYetDelivered.value = records.filter(isNotYetDelivered).length;
+  if (cfg.mapped.has("createdAt")) {
+    const curInRange = records.filter((r) => within(r.createdAt, range) && isNotYetDelivered(r)).length;
+    const prevInRange = records.filter((r) => within(r.createdAt, prev) && isNotYetDelivered(r)).length;
+    notYetDelivered.previous = prevInRange;
+    notYetDelivered.deltaPct = pctDelta(curInRange, prevInRange);
+    notYetDelivered.sparkline = starts.map((s) => {
+      const lo = Math.max(s.getTime(), range.from.getTime());
+      const hi = Math.min(s.getTime() + step, range.to.getTime());
+      return records.filter((r) => {
+        const t = ms(r.createdAt);
+        return !Number.isNaN(t) && t >= lo && t < hi && isNotYetDelivered(r);
+      }).length;
+    });
+  }
+
+  // 3. Open now
   const open = mk(
     {
       key: "open",
@@ -128,86 +226,7 @@ export function computeKpis(records: OpsRecord[], range: DateRange, cfg: Metrics
     open.missing = ["status"];
   }
 
-  const created = mk(
-    { key: "created", label: "Created", definition: "Records whose created date falls inside the selected range.", requires: ["createdAt"], unit: "count", good: "down" },
-    cfg,
-  );
-  if (created.available) {
-    created.value = records.filter((r) => within(r.createdAt, range)).length;
-    created.previous = records.filter((r) => within(r.createdAt, prev)).length;
-    created.deltaPct = pctDelta(created.value, created.previous);
-    created.sparkline = trend.map((p) => p.created);
-  }
-
-  const resolved = mk(
-    { key: "resolved", label: "Resolved", definition: "Records whose resolved date falls inside the selected range.", requires: ["resolvedAt"], unit: "count", good: "up" },
-    cfg,
-  );
-  if (resolved.available) {
-    resolved.value = records.filter((r) => within(r.resolvedAt, range)).length;
-    resolved.previous = records.filter((r) => within(r.resolvedAt, prev)).length;
-    resolved.deltaPct = pctDelta(resolved.value, resolved.previous);
-    resolved.sparkline = trend.map((p) => p.resolved);
-  }
-
-  const overdue = mk(
-    { key: "overdue", label: "Overdue now", definition: "Open records whose due date has already passed.", requires: ["dueAt", ...completionNeeded], unit: "count", good: "down" },
-    cfg,
-  );
-  if (overdue.available && hasCompletionInfo(cfg)) overdue.value = records.filter((r) => isOverdue(r, cfg)).length;
-  else if (overdue.available) { overdue.available = false; overdue.missing = ["status"]; }
-
-  const sla = mk(
-    {
-      key: "sla",
-      label: "On-time resolution",
-      definition: "Of records resolved in the range that have a due date, the share resolved on or before it.",
-      requires: ["dueAt", "resolvedAt"],
-      unit: "percent",
-      good: "up",
-      target: cfg.slaTargetPercent,
-    },
-    cfg,
-  );
-  if (sla.available) {
-    const calc = (rng: DateRange) => {
-      const set = records.filter((r) => within(r.resolvedAt, rng) && r.dueAt);
-      if (!set.length) return { pct: null as number | null, n: 0 };
-      const met = set.filter((r) => ms(r.resolvedAt) <= ms(r.dueAt)).length;
-      return { pct: (met / set.length) * 100, n: set.length };
-    };
-    const cur = calc(range);
-    sla.value = cur.pct;
-    sla.sample = cur.n;
-    sla.previous = calc(prev).pct;
-    sla.deltaPct = sla.value !== null && sla.previous !== null ? sla.value - sla.previous : null; // percentage points
-  }
-
-  const ttr = mk(
-    {
-      key: "ttr",
-      label: "Median time to resolve",
-      definition: "Median of (resolved − created) for records resolved in the range.",
-      requires: ["createdAt", "resolvedAt"],
-      unit: "hours",
-      good: "down",
-    },
-    cfg,
-  );
-  if (ttr.available) {
-    const durations = (rng: DateRange) =>
-      records
-        .filter((r) => within(r.resolvedAt, rng) && r.createdAt)
-        .map((r) => (ms(r.resolvedAt) - ms(r.createdAt)) / HOUR)
-        .filter((h) => h >= 0);
-    const cur = durations(range);
-    ttr.value = median(cur);
-    ttr.sample = cur.length;
-    ttr.previous = median(durations(prev));
-    ttr.deltaPct = pctDelta(ttr.value, ttr.previous);
-  }
-
-  return [open, created, resolved, overdue, sla, ttr];
+  return [notYetProcessed, notYetDelivered, open];
 }
 
 // ----------------------------------------------------------------------------- trend
