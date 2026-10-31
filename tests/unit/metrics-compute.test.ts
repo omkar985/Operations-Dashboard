@@ -89,14 +89,16 @@ describe("Metrics Pure Function Calculations", () => {
 
     const notYetProcKpi = kpis.find((k) => k.key === "not_yet_processed");
     expect(notYetProcKpi).toBeDefined();
-    expect(notYetProcKpi?.label).toBe("Not Yet Processed");
+    expect(notYetProcKpi?.label).toBe("Pending Processing");
 
     const notYetDelivKpi = kpis.find((k) => k.key === "not_yet_delivered");
     expect(notYetDelivKpi).toBeDefined();
-    expect(notYetDelivKpi?.label).toBe("Not Yet Delivered");
+    expect(notYetDelivKpi?.label).toBe("Pending Delivery");
 
-    const openKpi = kpis.find((k) => k.key === "open");
-    expect(openKpi?.value).toBe(2); // REC-3 and REC-4
+    const monthlyKpi = kpis.find((k) => k.key === "monthly_received");
+    expect(monthlyKpi).toBeDefined();
+    expect(monthlyKpi?.label).toBe("Monthly Orders Received");
+
 
     // Removed KPI cards should not be in the list
     expect(kpis.find((k) => k.key === "created")).toBeUndefined();

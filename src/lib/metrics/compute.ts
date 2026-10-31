@@ -1,5 +1,5 @@
 import type { FieldKey, OpsRecord } from "@/types/operations";
-import { getRecordCol, getRecordStatus } from "@/lib/google-sheets/mapping";
+import { getRecordCol, getRecordStatus, parseSheetDate } from "@/lib/google-sheets/mapping";
 
 /**
  * Operational metrics — pure functions over normalised records.
@@ -72,6 +72,45 @@ export function isNotYetDelivered(r: OpsRecord): boolean {
   return isDeliveredNotYes && notDeliveredOrRtoOrReturns;
 }
 
+/** Extracts and normalizes the order date from record createdAt or raw columns. */
+export function getRecordOrderDate(r: OpsRecord): Date | null {
+  if (r.createdAt) {
+    const d = new Date(r.createdAt);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  const rawDate = getRecordCol(r, "Order Date") ?? getRecordCol(r, "Date") ?? getRecordCol(r, "created");
+  if (!rawDate) return null;
+  const iso = parseSheetDate(rawDate, "ISO") ?? parseSheetDate(rawDate, "DMY") ?? parseSheetDate(rawDate, "MDY");
+  if (iso) {
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+/** Extracts the numeric order amount (e.g. from Amt or Amount). */
+export function getRecordAmount(r: OpsRecord): number | null {
+  const rawAmt = getRecordCol(r, "Amt") ?? getRecordCol(r, "Amount") ?? getRecordCol(r, "Total");
+  if (rawAmt === null || rawAmt === undefined) return null;
+  const cleaned = String(rawAmt).replace(/[^0-9.-]+/g, "");
+  const num = parseFloat(cleaned);
+  return Number.isFinite(num) ? num : null;
+}
+
+/**
+ * Filter: Monthly Received
+ * Criteria: Order placed in the active date range or current calendar month.
+ */
+export function isMonthlyReceived(r: OpsRecord, range?: DateRange, now: Date = new Date()): boolean {
+  const d = getRecordOrderDate(r);
+  if (!d) return true; // Include if date unmapped or row is in Above 50k tab
+  if (range) {
+    const t = d.getTime();
+    return t >= range.from.getTime() && t < range.to.getTime();
+  }
+  return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+}
+
 const within = (iso: string | null, range: DateRange) => {
   const t = ms(iso);
   return !Number.isNaN(t) && t >= range.from.getTime() && t < range.to.getTime();
@@ -92,6 +131,7 @@ export function median(values: number[]): number | null {
 // ----------------------------------------------------------------------------- KPIs
 
 export type KpiKey =
+  | "monthly_received"
   | "not_yet_processed"
   | "not_yet_delivered"
   | "open"
@@ -122,6 +162,8 @@ export interface Kpi {
   /** Sample size behind a ratio/median. */
   sample?: number;
   target?: number;
+  /** Total order value in INR (e.g. for high-value orders). */
+  totalAmount?: number;
 }
 
 function mk(
@@ -137,16 +179,49 @@ const pctDelta = (cur: number | null, prev: number | null) =>
 
 export function computeKpis(records: OpsRecord[], range: DateRange, cfg: MetricsConfig): Kpi[] {
   const prev = previousRange(range);
-  const completionNeeded: FieldKey[] = cfg.mapped.has("resolvedAt") ? ["resolvedAt"] : ["status"];
-  const trend = buildTrend(records, range, cfg);
   const starts = bucketStarts(range);
   const step = granularityFor(range) === "day" ? DAY : 7 * DAY;
 
-  // 1. Not Yet Processed (Requested KPI 1)
+  // 1. Monthly Orders Received (Requested KPI: Monthly Received count)
+  const monthlyReceivedOrders = records.filter((r) => isMonthlyReceived(r, range, cfg.now));
+  const monthlyReceivedTotalAmt = monthlyReceivedOrders.reduce((sum, r) => sum + (getRecordAmount(r) ?? 0), 0);
+
+  const monthlyReceived = mk(
+    {
+      key: "monthly_received",
+      label: "Monthly Orders Received",
+      definition: "Total high-value orders (Above ₹50,000) received in the active monthly cycle.",
+      requires: [],
+      unit: "count",
+      good: "up",
+    },
+    cfg,
+  );
+  monthlyReceived.available = true;
+  monthlyReceived.value = monthlyReceivedOrders.length;
+  monthlyReceived.totalAmount = monthlyReceivedTotalAmt;
+
+  const prevMonthlyOrders = records.filter((r) => isMonthlyReceived(r, prev, cfg.now));
+  monthlyReceived.previous = prevMonthlyOrders.length;
+  monthlyReceived.deltaPct = pctDelta(monthlyReceived.value, monthlyReceived.previous);
+  monthlyReceived.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return records.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi;
+    }).length;
+  });
+
+  // 2. Pending Processing (Requested KPI: Not Yet Processed - renamed professionally)
+  const pendingProcessingOrders = records.filter(isNotYetProcessed);
+  const pendingProcessingTotalAmt = pendingProcessingOrders.reduce((sum, r) => sum + (getRecordAmount(r) ?? 0), 0);
+
   const notYetProcessed = mk(
     {
       key: "not_yet_processed",
-      label: "Not Yet Processed",
+      label: "Pending Processing",
       definition: 'Orders where "Action taken" is blank and status does not contain "cancelled".',
       requires: [],
       unit: "count",
@@ -155,27 +230,31 @@ export function computeKpis(records: OpsRecord[], range: DateRange, cfg: Metrics
     cfg,
   );
   notYetProcessed.available = true;
-  notYetProcessed.value = records.filter(isNotYetProcessed).length;
-  if (cfg.mapped.has("createdAt")) {
-    const curInRange = records.filter((r) => within(r.createdAt, range) && isNotYetProcessed(r)).length;
-    const prevInRange = records.filter((r) => within(r.createdAt, prev) && isNotYetProcessed(r)).length;
-    notYetProcessed.previous = prevInRange;
-    notYetProcessed.deltaPct = pctDelta(curInRange, prevInRange);
-    notYetProcessed.sparkline = starts.map((s) => {
-      const lo = Math.max(s.getTime(), range.from.getTime());
-      const hi = Math.min(s.getTime() + step, range.to.getTime());
-      return records.filter((r) => {
-        const t = ms(r.createdAt);
-        return !Number.isNaN(t) && t >= lo && t < hi && isNotYetProcessed(r);
-      }).length;
-    });
-  }
+  notYetProcessed.value = pendingProcessingOrders.length;
+  notYetProcessed.totalAmount = pendingProcessingTotalAmt;
 
-  // 2. Not yet Delivered (Requested KPI 2)
+  const curProcInRange = records.filter((r) => isMonthlyReceived(r, range, cfg.now) && isNotYetProcessed(r)).length;
+  const prevProcInRange = records.filter((r) => isMonthlyReceived(r, prev, cfg.now) && isNotYetProcessed(r)).length;
+  notYetProcessed.previous = prevProcInRange;
+  notYetProcessed.deltaPct = pctDelta(curProcInRange, prevProcInRange);
+  notYetProcessed.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return records.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi && isNotYetProcessed(r);
+    }).length;
+  });
+
+  // 3. Pending Delivery (Requested KPI: Not Yet Delivered - renamed professionally)
+  const pendingDeliveryOrders = records.filter(isNotYetDelivered);
+  const pendingDeliveryTotalAmt = pendingDeliveryOrders.reduce((sum, r) => sum + (getRecordAmount(r) ?? 0), 0);
+
   const notYetDelivered = mk(
     {
       key: "not_yet_delivered",
-      label: "Not Yet Delivered",
+      label: "Pending Delivery",
       definition: 'Orders where "Delivered yes/no)" is not "Yes" and status does not contain "Delivered", "RTO", or "Returns".',
       requires: [],
       unit: "count",
@@ -184,49 +263,24 @@ export function computeKpis(records: OpsRecord[], range: DateRange, cfg: Metrics
     cfg,
   );
   notYetDelivered.available = true;
-  notYetDelivered.value = records.filter(isNotYetDelivered).length;
-  if (cfg.mapped.has("createdAt")) {
-    const curInRange = records.filter((r) => within(r.createdAt, range) && isNotYetDelivered(r)).length;
-    const prevInRange = records.filter((r) => within(r.createdAt, prev) && isNotYetDelivered(r)).length;
-    notYetDelivered.previous = prevInRange;
-    notYetDelivered.deltaPct = pctDelta(curInRange, prevInRange);
-    notYetDelivered.sparkline = starts.map((s) => {
-      const lo = Math.max(s.getTime(), range.from.getTime());
-      const hi = Math.min(s.getTime() + step, range.to.getTime());
-      return records.filter((r) => {
-        const t = ms(r.createdAt);
-        return !Number.isNaN(t) && t >= lo && t < hi && isNotYetDelivered(r);
-      }).length;
-    });
-  }
+  notYetDelivered.value = pendingDeliveryOrders.length;
+  notYetDelivered.totalAmount = pendingDeliveryTotalAmt;
 
-  // 3. Open now
-  const open = mk(
-    {
-      key: "open",
-      label: "Open items",
-      definition: cfg.mapped.has("resolvedAt")
-        ? "Records with no resolved date (or a completed status) right now."
-        : "Records whose status is not one of the configured completed statuses, right now.",
-      requires: completionNeeded,
-      unit: "count",
-      good: "down",
-    },
-    cfg,
-  );
-  if (open.available && hasCompletionInfo(cfg)) {
-    open.value = records.filter((r) => !isComplete(r, cfg)).length;
-    if (cfg.mapped.has("createdAt") && cfg.mapped.has("resolvedAt")) {
-      open.previous = backlogAt(records, range.from.getTime());
-      open.deltaPct = pctDelta(open.value, open.previous);
-      open.sparkline = trend.map((p) => p.backlog ?? 0);
-    }
-  } else if (open.available) {
-    open.available = false;
-    open.missing = ["status"];
-  }
+  const curDelivInRange = records.filter((r) => isMonthlyReceived(r, range, cfg.now) && isNotYetDelivered(r)).length;
+  const prevDelivInRange = records.filter((r) => isMonthlyReceived(r, prev, cfg.now) && isNotYetDelivered(r)).length;
+  notYetDelivered.previous = prevDelivInRange;
+  notYetDelivered.deltaPct = pctDelta(curDelivInRange, prevDelivInRange);
+  notYetDelivered.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return records.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi && isNotYetDelivered(r);
+    }).length;
+  });
 
-  return [notYetProcessed, notYetDelivered, open];
+  return [monthlyReceived, notYetProcessed, notYetDelivered];
 }
 
 // ----------------------------------------------------------------------------- trend

@@ -316,7 +316,7 @@ const ALIASES: Record<FieldKey, string[]> = {
   category: ["category", "type", "queue", "issue type", "department", "group"],
   team: ["team", "squad", "owner team", "assigned team"],
   assignee: ["assignee", "assigned to", "owner", "agent", "handler", "assigned agent"],
-  createdAt: ["created", "created at", "created date", "date created", "opened", "opened at", "created on", "created time", "date"],
+  createdAt: ["order date", "order_date", "orderdate", "created", "created at", "created date", "date created", "opened", "opened at", "created on", "created time", "date"],
   dueAt: ["due", "due at", "due date", "sla due", "deadline", "sla deadline", "target date"],
   resolvedAt: ["resolved", "resolved at", "resolved date", "closed", "closed at", "closed date", "completed", "completed at", "done at"],
 };

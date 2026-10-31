@@ -5,7 +5,7 @@ import { getThresholds } from "@/server/services/settings-service";
 import { parseRange } from "@/lib/metrics/range";
 import { computeKpis, type MetricsConfig } from "@/lib/metrics/compute";
 import type { FieldKey } from "@/types/operations";
-import { KpiLedger } from "@/components/ui/kpi-ledger";
+import { Above50kSection } from "@/components/dashboard/above-50k-section";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LiveRefreshHeader } from "@/components/dashboard/live-refresh-header";
@@ -137,8 +137,8 @@ export default async function DashboardPage(props: DashboardPageProps) {
         </div>
       )}
 
-      {/* KPI Cards */}
-      <KpiLedger kpis={kpis} />
+      {/* Above 50k Orders Section with Glassmorphic Cards & Drill-down Modal */}
+      <Above50kSection records={dataset.records} kpis={kpis} range={parsedRange} />
     </div>
   );
 }
