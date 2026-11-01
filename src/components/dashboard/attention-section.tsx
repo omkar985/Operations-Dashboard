@@ -59,7 +59,7 @@ export function AttentionSection({ items }: AttentionSectionProps) {
           </Link>
         </div>
 
-        <div className="table-wrap">
+        <div className="table-wrap" data-lenis-prevent>
           <table className="table">
             <thead>
               <tr>

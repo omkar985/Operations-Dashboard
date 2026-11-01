@@ -281,10 +281,10 @@ export function DateRangeFilter({ currentRange, className = "" }: DateRangeFilte
 
       {/* Themed Custom Calendar Popover */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2.5 z-50 p-4 rounded-2xl backdrop-blur-2xl bg-white/95 dark:bg-slate-900/95 border border-slate-200/90 dark:border-white/10 shadow-2xl w-[320px] sm:w-[460px] animate-in fade-in zoom-in-95 duration-150">
+        <div data-lenis-prevent className="absolute right-0 top-full mt-2.5 z-50 p-4 rounded-2xl backdrop-blur-2xl bg-white/95 dark:bg-slate-900/95 border border-slate-200/90 dark:border-white/10 shadow-2xl w-[320px] sm:w-[460px] animate-in fade-in zoom-in-95 duration-150">
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Quick Presets Column */}
-            <div className="sm:w-36 shrink-0 flex flex-row sm:flex-col gap-1 border-b sm:border-b-0 sm:border-r border-slate-200/70 dark:border-white/10 pb-3 sm:pb-0 sm:pr-3 overflow-x-auto sm:overflow-visible">
+            <div data-lenis-prevent className="sm:w-36 shrink-0 flex flex-row sm:flex-col gap-1 border-b sm:border-b-0 sm:border-r border-slate-200/70 dark:border-white/10 pb-3 sm:pb-0 sm:pr-3 overflow-x-auto sm:overflow-visible">
               <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1 hidden sm:block">
                 Quick Select
               </span>

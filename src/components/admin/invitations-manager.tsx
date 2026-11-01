@@ -258,7 +258,7 @@ export function InvitationsManager({ initialInvitations }: InvitationsManagerPro
 
         {/* Invitations Table */}
         <div className="panel overflow-hidden">
-          <div className="table-wrap">
+          <div className="table-wrap" data-lenis-prevent>
             <table className="table">
               <thead>
                 <tr>

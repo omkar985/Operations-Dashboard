@@ -283,12 +283,14 @@ export function KpiRecordsModal({
     <div
       role="dialog"
       aria-modal="true"
+      data-lenis-prevent
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
+        data-lenis-prevent
         onWheel={handleDialogWheel}
         className="relative w-full max-w-6xl h-[88vh] max-h-[900px] min-h-[440px] flex flex-col rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
       >
@@ -411,6 +413,7 @@ export function KpiRecordsModal({
         {/* Scrollable Table View */}
         <div
           ref={tableScrollRef}
+          data-lenis-prevent
           tabIndex={0}
           className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-auto overscroll-contain focus:outline-none"
           style={{

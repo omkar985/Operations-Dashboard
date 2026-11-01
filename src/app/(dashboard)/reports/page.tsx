@@ -206,7 +206,7 @@ export default async function ReportsPage(props: ReportsPageProps) {
           </div>
         </div>
 
-        <div className="table-wrap">
+        <div className="table-wrap" data-lenis-prevent>
           <table className="table">
             <thead>
               <tr>

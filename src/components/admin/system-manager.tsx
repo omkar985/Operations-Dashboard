@@ -276,7 +276,7 @@ export function SystemManager({
           </div>
         </div>
 
-        <div className="table-wrap">
+        <div className="table-wrap" data-lenis-prevent>
           <table className="table">
             <thead>
               <tr>
@@ -357,7 +357,7 @@ export function SystemManager({
           </div>
         </div>
 
-        <div className="table-wrap">
+        <div className="table-wrap" data-lenis-prevent>
           <table className="table">
             <thead>
               <tr>

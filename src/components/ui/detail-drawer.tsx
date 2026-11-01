@@ -58,6 +58,7 @@ export function DetailDrawer({ record, onClose, open }: DetailDrawerProps) {
             className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[var(--card)] border-l border-[var(--line)] shadow-pop flex flex-col"
             role="dialog"
             aria-modal="true"
+            data-lenis-prevent
           >
             {/* Header */}
             <div className="p-5 border-b border-[var(--line-subtle)] flex items-start justify-between gap-4">
@@ -89,7 +90,7 @@ export function DetailDrawer({ record, onClose, open }: DetailDrawerProps) {
             </div>
 
             {/* Scrollable details */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-6">
+            <div data-lenis-prevent className="flex-1 overflow-y-auto p-5 space-y-6">
               {/* Properties Grid */}
               <div className="space-y-3">
                 <h3 className="eyebrow">Attributes</h3>

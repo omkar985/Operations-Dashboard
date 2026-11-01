@@ -155,7 +155,7 @@ export function MembersManager({ currentUser, initialUsers }: MembersManagerProp
         </div>
 
         {/* Members Table */}
-        <div className="table-wrap">
+        <div className="table-wrap" data-lenis-prevent>
           <table className="table">
             <thead>
               <tr>

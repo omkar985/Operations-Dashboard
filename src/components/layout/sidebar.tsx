@@ -135,7 +135,7 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
           </div>
 
           {/* Navigation Links */}
-          <nav className="p-3 space-y-5 overflow-y-auto flex-1">
+          <nav data-lenis-prevent className="p-3 space-y-5 overflow-y-auto flex-1">
             <div>
               <div className="px-3 mb-2 text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                 Operations
