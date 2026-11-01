@@ -3,9 +3,16 @@ import { AlertTriangle, ArrowRight, Settings2, RefreshCw } from "lucide-react";
 import { getDataset } from "@/server/services/dataset-service";
 import { getThresholds } from "@/server/services/settings-service";
 import { parseRange } from "@/lib/metrics/range";
-import { computeKpis, type MetricsConfig } from "@/lib/metrics/compute";
+import {
+  computeKpis,
+  computeVModaKpis,
+  isAbove50kRecord,
+  isVModaRecord,
+  type MetricsConfig,
+} from "@/lib/metrics/compute";
 import type { FieldKey } from "@/types/operations";
 import { Above50kSection } from "@/components/dashboard/above-50k-section";
+import { VModaSection } from "@/components/dashboard/vmoda-section";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LiveRefreshHeader } from "@/components/dashboard/live-refresh-header";
@@ -93,14 +100,18 @@ export default async function DashboardPage(props: DashboardPageProps) {
     now,
   };
 
-  const kpis = computeKpis(dataset.records, parsedRange, metricsConfig);
+  const above50kRecords = dataset.records.filter(isAbove50kRecord);
+  const vmodaRecords = dataset.records.filter(isVModaRecord);
+
+  const above50kKpis = computeKpis(above50kRecords, parsedRange, metricsConfig);
+  const vmodaKpis = computeVModaKpis(dataset.records, parsedRange, metricsConfig);
 
   const exportUrl = `/api/operations/export?range=${encodeURIComponent(
     parsedRange.key
   )}${parsedRange.key === "custom" ? `&from=${parsedRange.fromInput}&to=${parsedRange.toInput}` : ""}`;
 
   return (
-    <div className="page space-y-6">
+    <div className="page space-y-8">
       {/* Top Header Row: Brand Title & Live Telemetry Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -138,7 +149,10 @@ export default async function DashboardPage(props: DashboardPageProps) {
       )}
 
       {/* Above 50k Orders Section with Glassmorphic Cards & Drill-down Modal */}
-      <Above50kSection records={dataset.records} kpis={kpis} range={parsedRange} />
+      <Above50kSection records={above50kRecords} kpis={above50kKpis} range={parsedRange} />
+
+      {/* V-MODA Engraving Orders Section with Glassmorphic Cards & Drill-down Modal */}
+      <VModaSection records={vmodaRecords} kpis={vmodaKpis} range={parsedRange} />
     </div>
   );
 }

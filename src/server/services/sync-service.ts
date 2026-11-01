@@ -58,10 +58,12 @@ export async function runSync(opts: { trigger: SyncTrigger; actor?: SessionUser 
     const info = await getSpreadsheetInfo();
     const cfg = getSheetsConfig();
 
-    // Support single worksheet or multiple subsheets (comma-separated or configured in env)
-    const sheetTitles = mapping.worksheet.includes(",")
+    // Support single worksheet or multiple subsheets (comma-separated in mapping or configured in env)
+    const mappingSheets = mapping.worksheet.includes(",")
       ? mapping.worksheet.split(",").map((s) => s.trim()).filter(Boolean)
-      : (cfg?.worksheets && cfg.worksheets.length > 1 ? cfg.worksheets : [mapping.worksheet]);
+      : [mapping.worksheet.trim()].filter(Boolean);
+    const envSheets = cfg?.worksheets ?? [];
+    const sheetTitles = Array.from(new Set([...mappingSheets, ...envSheets]));
 
     const targetWorksheets = sheetTitles
       .map((name) => info.worksheets.find((w) => w.title === name) ?? info.worksheets.find((w) => w.title.toLowerCase() === name.toLowerCase()))
@@ -79,13 +81,21 @@ export async function runSync(opts: { trigger: SyncTrigger; actor?: SessionUser 
     let allRowsBlank = 0;
     const warnings: SyncWarning[] = [];
 
-    for (const ws of targetWorksheets) {
+    for (let wsIdx = 0; wsIdx < targetWorksheets.length; wsIdx++) {
+      const ws = targetWorksheets[wsIdx];
       const read = await readWorksheet(ws, mapping.headerRow);
       const mapped = mapRows(read.rows, read.headers, mapping, mapping.headerRow + 1, ws.title);
       allRowsRead += mapped.rowsRead;
       allRowsBlank += mapped.rowsBlank;
       allRecords = allRecords.concat(mapped.records);
-      warnings.push(...mapped.warnings);
+
+      // Only propagate MISSING_COLUMN warnings for the primary worksheet to avoid false alarms on subsheets with different headers
+      if (wsIdx === 0 || targetWorksheets.length === 1) {
+        warnings.push(...mapped.warnings);
+      } else {
+        warnings.push(...mapped.warnings.filter((w) => w.code !== "MISSING_COLUMN"));
+      }
+
       if (read.truncated) {
         warnings.push({
           code: "ROW_LIMIT",

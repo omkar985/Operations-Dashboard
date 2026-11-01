@@ -13,6 +13,9 @@ import {
   ArrowUpRight,
   RotateCcw,
   TrendingUp,
+  Users,
+  Palette,
+  Sparkles,
 } from "lucide-react";
 
 interface KpiLedgerProps {
@@ -76,6 +79,48 @@ const KPI_CONFIG: Record<
     filterRules: [
       { label: "Delivered (yes/no)", value: 'Is not "Yes"' },
       { label: "Tracking Status", value: 'Does not contain "Delivered", "RTO", or "Returns"' },
+    ],
+  },
+  vmoda_waiting_customer: {
+    icon: Users,
+    tag: "Awaiting Response",
+    tagStyle: "bg-sky-50 dark:bg-sky-950/50 text-[#0284C7] dark:text-[#38BDF8] border-sky-200/80 dark:border-sky-800/50",
+    iconStyle: "text-[#0284C7] dark:text-[#38BDF8] bg-[#0284C7]/10 border-[#0284C7]/20",
+    glowGradient: "from-[#0284C7]/8 via-[#0284C7]/3 to-transparent",
+    sparklineColor: "#0284C7",
+    sublabel: "Awaiting client design confirmation",
+    filterTitle: "Waiting on Customer Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"V-MODA"' },
+      { label: "Status Column", value: 'Set to "Waiting on Customer"' },
+    ],
+  },
+  vmoda_waiting_logo: {
+    icon: Palette,
+    tag: "Design Asset",
+    tagStyle: "bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200/80 dark:border-purple-800/50",
+    iconStyle: "text-purple-600 dark:text-purple-400 bg-purple-500/10 border-purple-500/20",
+    glowGradient: "from-purple-500/8 via-purple-500/3 to-transparent",
+    sparklineColor: "#A855F7",
+    sublabel: "Awaiting vector logo artwork",
+    filterTitle: "Waiting on Logo Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"V-MODA"' },
+      { label: "Status Column", value: 'Set to "Waiting on Logo"' },
+    ],
+  },
+  vmoda_waiting_engraving: {
+    icon: Sparkles,
+    tag: "Production Queue",
+    tagStyle: "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/50",
+    iconStyle: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20",
+    glowGradient: "from-amber-500/8 via-amber-500/3 to-transparent",
+    sparklineColor: "#F59E0B",
+    sublabel: "Ready for laser engraving machine",
+    filterTitle: "Waiting on Engraving Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"V-MODA"' },
+      { label: "Status Column", value: 'Set to "Waiting on Engraving"' },
     ],
   },
 };

@@ -8,6 +8,12 @@ import {
   needsAttention,
   isNotYetProcessed,
   isNotYetDelivered,
+  isVModaRecord,
+  isAbove50kRecord,
+  isWaitingOnCustomer,
+  isWaitingOnLogo,
+  isWaitingOnEngraving,
+  computeVModaKpis,
   type MetricsConfig,
   type DateRange,
 } from "@/lib/metrics/compute";
@@ -314,5 +320,143 @@ describe("Metrics Pure Function Calculations", () => {
     expect(bins).not.toBeNull();
     const totalInBins = bins!.reduce((sum, b) => sum + b.count, 0);
     expect(totalInBins).toBe(2);
+  });
+
+  describe("V-MODA Engraving Metrics & Filters", () => {
+    const vmodaRecords: OpsRecord[] = [
+      {
+        row: 2,
+        subsheet: "V-MODA",
+        id: "932101",
+        title: "Order 932101",
+        status: "Waiting on Customer",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order no.": "#932101",
+          "Email id": "cust1@example.com",
+          "Amount": "19999",
+          "SKU": "V-MODA - M-100 Master",
+          "Wants it Engraved?": "Yes",
+          "Status": "Waiting on Customer",
+          "Remark": "Customer to share logo",
+          "Dispatched or Not ": "",
+        },
+      },
+      {
+        row: 3,
+        subsheet: "V-MODA",
+        id: "932102",
+        title: "Order 932102",
+        status: "Waiting on Logo",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order no.": "#932102",
+          "Email id": "cust2@example.com",
+          "Amount": "24999",
+          "SKU": "V-MODA - Crossfade 3 Wireless",
+          "Wants it Engraved?": "Yes",
+          "Status": "Waiting on Logo",
+          "Remark": "Requested vector SVG",
+          "Dispatched or Not ": "",
+        },
+      },
+      {
+        row: 4,
+        subsheet: "V-MODA",
+        id: "932103",
+        title: "Order 932103",
+        status: "Waiting on Engraving",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order no.": "#932103",
+          "Email id": "cust3@example.com",
+          "Amount": "21999",
+          "SKU": "V-MODA - M-200 ANC",
+          "Wants it Engraved?": "Yes",
+          "Status": "Waiting on Engraving",
+          "Remark": "Logo approved",
+          "Dispatched or Not ": "",
+        },
+      },
+      {
+        row: 5,
+        subsheet: "Above 50k Orders",
+        id: "932104",
+        title: "Order 932104",
+        status: "In Transit",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order No": "#932104",
+          "Amt": "65000",
+          "Action taken": "bluedart - 12345678",
+          "status": "In Transit",
+        },
+      },
+    ];
+
+    it("correctly identifies V-MODA vs Above 50k records", () => {
+      expect(isVModaRecord(vmodaRecords[0])).toBe(true);
+      expect(isVModaRecord(vmodaRecords[1])).toBe(true);
+      expect(isVModaRecord(vmodaRecords[2])).toBe(true);
+      expect(isVModaRecord(vmodaRecords[3])).toBe(false);
+
+      expect(isAbove50kRecord(vmodaRecords[3])).toBe(true);
+      expect(isAbove50kRecord(vmodaRecords[0])).toBe(false);
+    });
+
+    it("correctly filters V-MODA status conditions", () => {
+      expect(isWaitingOnCustomer(vmodaRecords[0])).toBe(true);
+      expect(isWaitingOnCustomer(vmodaRecords[1])).toBe(false);
+
+      expect(isWaitingOnLogo(vmodaRecords[1])).toBe(true);
+      expect(isWaitingOnLogo(vmodaRecords[2])).toBe(false);
+
+      expect(isWaitingOnEngraving(vmodaRecords[2])).toBe(true);
+      expect(isWaitingOnEngraving(vmodaRecords[0])).toBe(false);
+    });
+
+    it("computes accurate V-MODA KPIs with total counts and amounts", () => {
+      const kpis = computeVModaKpis(vmodaRecords, range, config);
+      expect(kpis.length).toBe(3);
+
+      const custKpi = kpis.find((k) => k.key === "vmoda_waiting_customer");
+      expect(custKpi).toBeDefined();
+      expect(custKpi?.value).toBe(1);
+      expect(custKpi?.totalAmount).toBe(19999);
+
+      const logoKpi = kpis.find((k) => k.key === "vmoda_waiting_logo");
+      expect(logoKpi).toBeDefined();
+      expect(logoKpi?.value).toBe(1);
+      expect(logoKpi?.totalAmount).toBe(24999);
+
+      const engrKpi = kpis.find((k) => k.key === "vmoda_waiting_engraving");
+      expect(engrKpi).toBeDefined();
+      expect(engrKpi?.value).toBe(1);
+      expect(engrKpi?.totalAmount).toBe(21999);
+    });
   });
 });

@@ -48,6 +48,28 @@ export function isOverdue(r: OpsRecord, cfg: MetricsConfig): boolean {
   return !isComplete(r, cfg) && ms(r.dueAt) < cfg.now.getTime();
 }
 
+/** Checks if a record belongs to the V-MODA subsheet / engraving cohort. */
+export function isVModaRecord(r: OpsRecord): boolean {
+  if (r.subsheet) {
+    const s = r.subsheet.toLowerCase();
+    if (s.includes("v-moda") || s.includes("vmoda")) return true;
+  }
+  if (r.raw) {
+    return Boolean(
+      getRecordCol(r, "Wants it Engraved?") !== null ||
+      getRecordCol(r, "Dispatched or Not ") !== null ||
+      getRecordCol(r, "Dispatched or Not") !== null ||
+      getRecordCol(r, "Email id") !== null
+    );
+  }
+  return false;
+}
+
+/** Checks if a record belongs to the Above 50k Orders subsheet. */
+export function isAbove50kRecord(r: OpsRecord): boolean {
+  return !isVModaRecord(r);
+}
+
 /**
  * Filter 1: Not Yet Processed
  * Criteria: "Action taken" is Blank AND status does not contain "cancelled"
@@ -72,19 +94,56 @@ export function isNotYetDelivered(r: OpsRecord): boolean {
   return isDeliveredNotYes && notDeliveredOrRtoOrReturns;
 }
 
+/**
+ * V-MODA Filter 1: Waiting on Customer
+ * Criteria: Status column contains "Waiting on Customer"
+ */
+export function isWaitingOnCustomer(r: OpsRecord): boolean {
+  const status = (getRecordCol(r, "Status") ?? getRecordStatus(r)).toLowerCase().trim();
+  return status.includes("waiting on customer");
+}
+
+/**
+ * V-MODA Filter 2: Waiting on Logo
+ * Criteria: Status column contains "Waiting on Logo"
+ */
+export function isWaitingOnLogo(r: OpsRecord): boolean {
+  const status = (getRecordCol(r, "Status") ?? getRecordStatus(r)).toLowerCase().trim();
+  return status.includes("waiting on logo");
+}
+
+/**
+ * V-MODA Filter 3: Waiting on Engraving
+ * Criteria: Status column contains "Waiting on Engraving"
+ */
+export function isWaitingOnEngraving(r: OpsRecord): boolean {
+  const status = (getRecordCol(r, "Status") ?? getRecordStatus(r)).toLowerCase().trim();
+  return status.includes("waiting on engraving");
+}
+
 /** Extracts and normalizes the order date from record createdAt or raw columns. */
 export function getRecordOrderDate(r: OpsRecord): Date | null {
   if (r.createdAt) {
     const d = new Date(r.createdAt);
     if (!Number.isNaN(d.getTime())) return d;
   }
-  const rawDate = getRecordCol(r, "Order Date") ?? getRecordCol(r, "Date") ?? getRecordCol(r, "created");
+  const rawDate =
+    getRecordCol(r, "Date and time stamp") ??
+    getRecordCol(r, "Date and timestamp") ??
+    getRecordCol(r, "Order Date") ??
+    getRecordCol(r, "Date") ??
+    getRecordCol(r, "created");
   if (!rawDate) return null;
-  const iso = parseSheetDate(rawDate, "ISO") ?? parseSheetDate(rawDate, "DMY") ?? parseSheetDate(rawDate, "MDY");
+  const iso =
+    parseSheetDate(rawDate, "ISO") ??
+    parseSheetDate(rawDate, "DMY") ??
+    parseSheetDate(rawDate, "MDY");
   if (iso) {
     const d = new Date(iso);
     if (!Number.isNaN(d.getTime())) return d;
   }
+  const direct = new Date(rawDate);
+  if (!Number.isNaN(direct.getTime())) return direct;
   return null;
 }
 
@@ -134,6 +193,9 @@ export type KpiKey =
   | "monthly_received"
   | "not_yet_processed"
   | "not_yet_delivered"
+  | "vmoda_waiting_customer"
+  | "vmoda_waiting_logo"
+  | "vmoda_waiting_engraving"
   | "open"
   | "created"
   | "resolved"
@@ -281,6 +343,133 @@ export function computeKpis(records: OpsRecord[], range: DateRange, cfg: Metrics
   });
 
   return [monthlyReceived, notYetProcessed, notYetDelivered];
+}
+
+export function computeVModaKpis(
+  records: OpsRecord[],
+  range: DateRange,
+  cfg: MetricsConfig,
+): Kpi[] {
+  const vmodaRecords = records.filter(isVModaRecord);
+  const prev = previousRange(range);
+  const starts = bucketStarts(range);
+  const step = granularityFor(range) === "day" ? DAY : 7 * DAY;
+
+  // 1. Waiting on Customer
+  const waitingCustOrders = vmodaRecords.filter(isWaitingOnCustomer);
+  const waitingCustTotalAmt = waitingCustOrders.reduce(
+    (sum, r) => sum + (getRecordAmount(r) ?? 0),
+    0
+  );
+  const waitingCustomer = mk(
+    {
+      key: "vmoda_waiting_customer",
+      label: "Waiting on Customer",
+      definition: 'V-MODA custom engraving orders where status is "Waiting on Customer".',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg
+  );
+  waitingCustomer.available = true;
+  waitingCustomer.value = waitingCustOrders.length;
+  waitingCustomer.totalAmount = waitingCustTotalAmt;
+  const curCustInRange = vmodaRecords.filter(
+    (r) => isMonthlyReceived(r, range, cfg.now) && isWaitingOnCustomer(r)
+  ).length;
+  const prevCustInRange = vmodaRecords.filter(
+    (r) => isMonthlyReceived(r, prev, cfg.now) && isWaitingOnCustomer(r)
+  ).length;
+  waitingCustomer.previous = prevCustInRange;
+  waitingCustomer.deltaPct = pctDelta(curCustInRange, prevCustInRange);
+  waitingCustomer.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return vmodaRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi && isWaitingOnCustomer(r);
+    }).length;
+  });
+
+  // 2. Waiting on Logo
+  const waitingLogoOrders = vmodaRecords.filter(isWaitingOnLogo);
+  const waitingLogoTotalAmt = waitingLogoOrders.reduce(
+    (sum, r) => sum + (getRecordAmount(r) ?? 0),
+    0
+  );
+  const waitingLogo = mk(
+    {
+      key: "vmoda_waiting_logo",
+      label: "Waiting on Logo",
+      definition: 'V-MODA custom engraving orders where status is "Waiting on Logo".',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg
+  );
+  waitingLogo.available = true;
+  waitingLogo.value = waitingLogoOrders.length;
+  waitingLogo.totalAmount = waitingLogoTotalAmt;
+  const curLogoInRange = vmodaRecords.filter(
+    (r) => isMonthlyReceived(r, range, cfg.now) && isWaitingOnLogo(r)
+  ).length;
+  const prevLogoInRange = vmodaRecords.filter(
+    (r) => isMonthlyReceived(r, prev, cfg.now) && isWaitingOnLogo(r)
+  ).length;
+  waitingLogo.previous = prevLogoInRange;
+  waitingLogo.deltaPct = pctDelta(curLogoInRange, prevLogoInRange);
+  waitingLogo.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return vmodaRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi && isWaitingOnLogo(r);
+    }).length;
+  });
+
+  // 3. Waiting on Engraving
+  const waitingEngrOrders = vmodaRecords.filter(isWaitingOnEngraving);
+  const waitingEngrTotalAmt = waitingEngrOrders.reduce(
+    (sum, r) => sum + (getRecordAmount(r) ?? 0),
+    0
+  );
+  const waitingEngraving = mk(
+    {
+      key: "vmoda_waiting_engraving",
+      label: "Waiting on Engraving",
+      definition: 'V-MODA custom engraving orders where status is "Waiting on Engraving".',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg
+  );
+  waitingEngraving.available = true;
+  waitingEngraving.value = waitingEngrOrders.length;
+  waitingEngraving.totalAmount = waitingEngrTotalAmt;
+  const curEngrInRange = vmodaRecords.filter(
+    (r) => isMonthlyReceived(r, range, cfg.now) && isWaitingOnEngraving(r)
+  ).length;
+  const prevEngrInRange = vmodaRecords.filter(
+    (r) => isMonthlyReceived(r, prev, cfg.now) && isWaitingOnEngraving(r)
+  ).length;
+  waitingEngraving.previous = prevEngrInRange;
+  waitingEngraving.deltaPct = pctDelta(curEngrInRange, prevEngrInRange);
+  waitingEngraving.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return vmodaRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi && isWaitingOnEngraving(r);
+    }).length;
+  });
+
+  return [waitingCustomer, waitingLogo, waitingEngraving];
 }
 
 // ----------------------------------------------------------------------------- trend

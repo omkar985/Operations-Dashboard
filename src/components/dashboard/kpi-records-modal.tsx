@@ -14,6 +14,9 @@ import {
   Truck,
   Layers,
   ArrowUpDown,
+  Users,
+  Palette,
+  Sparkles,
 } from "lucide-react";
 import type { OpsRecord } from "@/types/operations";
 import type { KpiKey, DateRange } from "@/lib/metrics/compute";
@@ -29,6 +32,10 @@ import {
   isNotYetProcessed,
   isNotYetDelivered,
   isMonthlyReceived,
+  isWaitingOnCustomer,
+  isWaitingOnLogo,
+  isWaitingOnEngraving,
+  isVModaRecord,
 } from "@/lib/metrics/compute";
 
 interface KpiRecordsModalProps {
@@ -144,8 +151,22 @@ export function KpiRecordsModal({
     if (kpiKey === "monthly_received") {
       return records.filter((r) => isMonthlyReceived(r, range));
     }
+    if (kpiKey === "vmoda_waiting_customer") {
+      return records.filter(isWaitingOnCustomer);
+    }
+    if (kpiKey === "vmoda_waiting_logo") {
+      return records.filter(isWaitingOnLogo);
+    }
+    if (kpiKey === "vmoda_waiting_engraving") {
+      return records.filter(isWaitingOnEngraving);
+    }
     return records;
   }, [kpiKey, records, range]);
+
+  const isVModaCohort = useMemo(() => {
+    if (kpiKey?.startsWith("vmoda_")) return true;
+    return cohortRecords.length > 0 && cohortRecords.every(isVModaRecord);
+  }, [kpiKey, cohortRecords]);
 
   // Search filter & sort
   const filteredRecords = useMemo(() => {
@@ -153,11 +174,26 @@ export function KpiRecordsModal({
     if (search.trim()) {
       const q = search.toLowerCase().trim();
       result = result.filter((r) => {
-        const orderNo = (getRecordCol(r, "Order No") ?? r.id ?? "").toLowerCase();
+        const orderNo = (
+          getRecordCol(r, "Order no.") ??
+          getRecordCol(r, "without #") ??
+          getRecordCol(r, "Order No") ??
+          r.id ??
+          ""
+        ).toLowerCase();
         const sku = (getRecordCol(r, "SKU") ?? "").toLowerCase();
-        const customer = (getRecordCol(r, "Name") ?? r.title ?? "").toLowerCase();
-        const status = getRecordStatus(r).toLowerCase();
-        const action = (getRecordCol(r, "Action taken") ?? "").toLowerCase();
+        const customer = (
+          getRecordCol(r, "Email id") ??
+          getRecordCol(r, "Name") ??
+          r.title ??
+          ""
+        ).toLowerCase();
+        const status = (getRecordCol(r, "Status") ?? getRecordStatus(r)).toLowerCase();
+        const action = (
+          getRecordCol(r, "Action taken") ??
+          getRecordCol(r, "Remark") ??
+          ""
+        ).toLowerCase();
         return (
           orderNo.includes(q) ||
           sku.includes(q) ||
@@ -175,8 +211,18 @@ export function KpiRecordsModal({
         return sortAsc ? amtA - amtB : amtB - amtA;
       }
       if (sortField === "order") {
-        const idA = getRecordCol(a, "without #") ?? getRecordCol(a, "Order No") ?? a.id ?? "";
-        const idB = getRecordCol(b, "without #") ?? getRecordCol(b, "Order No") ?? b.id ?? "";
+        const idA =
+          getRecordCol(a, "Order no.") ??
+          getRecordCol(a, "without #") ??
+          getRecordCol(a, "Order No") ??
+          a.id ??
+          "";
+        const idB =
+          getRecordCol(b, "Order no.") ??
+          getRecordCol(b, "without #") ??
+          getRecordCol(b, "Order No") ??
+          b.id ??
+          "";
         return sortAsc ? idA.localeCompare(idB) : idB.localeCompare(idA);
       }
       // Default: date descending
@@ -200,6 +246,65 @@ export function KpiRecordsModal({
 
   // Export current table view to CSV
   const handleExportCsv = () => {
+    if (isVModaCohort) {
+      const headers = [
+        "Order Number",
+        "Order Date",
+        "Customer Email",
+        "Amount (INR)",
+        "SKU",
+        "Engraving Requested",
+        "Status",
+        "Remark",
+        "Dispatched",
+        "Shopify Admin URL",
+      ];
+
+      const rows = filteredRecords.map((r) => {
+        const orderNo =
+          getRecordCol(r, "Order no.") ?? getRecordCol(r, "Order No") ?? r.id ?? "";
+        const cleanId = orderNo.replace(/^#/, "").trim();
+        const orderDate = formatDateDisplay(getRecordOrderDate(r));
+        const email = getRecordCol(r, "Email id") ?? "";
+        const amt = getRecordAmount(r) ?? 0;
+        const sku = getRecordCol(r, "SKU") ?? "";
+        const wantsEngraved = getRecordCol(r, "Wants it Engraved?") ?? "";
+        const status = getRecordCol(r, "Status") ?? getRecordStatus(r);
+        const remark = getRecordCol(r, "Remark") ?? "";
+        const dispatched =
+          getRecordCol(r, "Dispatched or Not ") ??
+          getRecordCol(r, "Dispatched or Not") ??
+          getRecordCol(r, "Dispatched") ??
+          "";
+        const shopifyUrl = `https://admin.shopify.com/store/headphonezone/orders?query=${encodeURIComponent(
+          cleanId
+        )}`;
+
+        return [
+          `"${orderNo.replace(/"/g, '""')}"`,
+          `"${orderDate}"`,
+          `"${email.replace(/"/g, '""')}"`,
+          amt,
+          `"${sku.replace(/"/g, '""')}"`,
+          `"${wantsEngraved.replace(/"/g, '""')}"`,
+          `"${status.replace(/"/g, '""')}"`,
+          `"${remark.replace(/"/g, '""')}"`,
+          `"${dispatched.replace(/"/g, '""')}"`,
+          `"${shopifyUrl}"`,
+        ].join(",");
+      });
+
+      const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${kpiTitle.toLowerCase().replace(/\s+/g, "-")}-orders.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
     const headers = [
       "Order Number",
       "Order Date",
@@ -270,13 +375,21 @@ export function KpiRecordsModal({
       ? Clock
       : kpiKey === "not_yet_delivered"
       ? Truck
+      : kpiKey === "vmoda_waiting_customer"
+      ? Users
+      : kpiKey === "vmoda_waiting_logo"
+      ? Palette
+      : kpiKey === "vmoda_waiting_engraving"
+      ? Sparkles
       : Layers;
 
   const headerTheme =
-    kpiKey === "not_yet_processed"
+    kpiKey === "not_yet_processed" || kpiKey === "vmoda_waiting_engraving"
       ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
       : kpiKey === "not_yet_delivered"
       ? "text-indigo-500 bg-indigo-500/10 border-indigo-500/20"
+      : kpiKey === "vmoda_waiting_logo"
+      ? "text-purple-500 bg-purple-500/10 border-purple-500/20"
       : "text-[#0284C7] bg-[#0284C7]/10 border-[#0284C7]/20";
 
   return (
@@ -313,7 +426,7 @@ export function KpiRecordsModal({
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Above ₹50,000 High-Value Orders &bull; Direct Google Sheet records &bull; Click order # to view in Shopify
+                {isVModaCohort ? "V-MODA Engraving Orders" : "Above ₹50,000 High-Value Orders"} &bull; Direct Google Sheet records &bull; Click order # to view in Shopify
               </p>
             </div>
           </div>
@@ -356,7 +469,11 @@ export function KpiRecordsModal({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by order #, SKU, customer, courier, status..."
+              placeholder={
+                isVModaCohort
+                  ? "Search by order #, SKU, customer email, status, remark..."
+                  : "Search by order #, SKU, customer, courier, status..."
+              }
               className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0284C7]/30 focus:border-[#0284C7]"
             />
             {search && (
@@ -431,7 +548,149 @@ export function KpiRecordsModal({
                 Try refining your search query or switching date range presets.
               </p>
             </div>
+          ) : isVModaCohort ? (
+            /* V-MODA Engraving Table */
+            <table className="w-full text-left text-xs border-collapse min-w-[760px]">
+              <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 font-semibold uppercase tracking-wider text-[10.5px]">
+                <tr>
+                  <th className="py-2.5 px-3 sm:px-4">Order Number</th>
+                  <th className="py-2.5 px-3 sm:px-4">Order Date</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-right">Amount</th>
+                  <th className="py-2.5 px-3 sm:px-4">SKU / Product</th>
+                  <th className="py-2.5 px-3 sm:px-4">Customer Email</th>
+                  <th className="py-2.5 px-3 sm:px-4">Engraving Status</th>
+                  <th className="py-2.5 px-3 sm:px-4">Remark</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Dispatched</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                {filteredRecords.map((r, i) => {
+                  const orderNo =
+                    getRecordCol(r, "Order no.") ??
+                    getRecordCol(r, "Order No") ??
+                    r.id ??
+                    `Row ${r.row}`;
+                  const cleanOrderId = orderNo.replace(/^#/, "").trim();
+                  const shopifyUrl = `https://admin.shopify.com/store/headphonezone/orders?query=${encodeURIComponent(
+                    cleanOrderId
+                  )}`;
+
+                  const orderDate = formatDateDisplay(getRecordOrderDate(r));
+                  const amt = getRecordAmount(r);
+                  const sku = getRecordCol(r, "SKU") ?? "—";
+                  const email = getRecordCol(r, "Email id") ?? "—";
+                  const status =
+                    getRecordCol(r, "Status") ?? getRecordStatus(r) ?? "Pending";
+                  const remark = getRecordCol(r, "Remark") ?? "—";
+                  const dispatchedRaw = (
+                    getRecordCol(r, "Dispatched or Not ") ??
+                    getRecordCol(r, "Dispatched or Not") ??
+                    getRecordCol(r, "Dispatched") ??
+                    ""
+                  ).trim().toLowerCase();
+                  const isDispatched = dispatchedRaw.includes("dispatch");
+
+                  // Status badge styling
+                  let statusBadgeClass =
+                    "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+                  const lowerStatus = status.toLowerCase();
+                  if (lowerStatus.includes("customer")) {
+                    statusBadgeClass =
+                      "bg-sky-50 dark:bg-sky-950/50 text-[#0284C7] dark:text-[#38BDF8] border-sky-200 dark:border-sky-800/40";
+                  } else if (lowerStatus.includes("logo")) {
+                    statusBadgeClass =
+                      "bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/40";
+                  } else if (lowerStatus.includes("engraving")) {
+                    statusBadgeClass =
+                      "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40";
+                  } else if (lowerStatus.includes("deliver")) {
+                    statusBadgeClass =
+                      "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40";
+                  }
+
+                  return (
+                    <tr
+                      key={r.id || `row-${r.row}-${i}`}
+                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                    >
+                      {/* 1. Order Number (Clickable to Shopify) */}
+                      <td className="py-2.5 px-3 sm:px-4 font-mono font-medium whitespace-nowrap">
+                        <a
+                          href={shopifyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[#0284C7] dark:text-[#38BDF8] hover:underline font-semibold"
+                          title="Open Order in Shopify Admin"
+                        >
+                          <span>{orderNo.startsWith("#") ? orderNo : `#${orderNo}`}</span>
+                          <ExternalLink className="w-3 h-3 opacity-70" />
+                        </a>
+                      </td>
+
+                      {/* 2. Order Date */}
+                      <td className="py-2.5 px-3 sm:px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {orderDate}
+                      </td>
+
+                      {/* 3. Amount */}
+                      <td className="py-2.5 px-3 sm:px-4 text-right font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                        {amt !== null ? `₹${amt.toLocaleString("en-IN")}` : "—"}
+                      </td>
+
+                      {/* 4. SKU */}
+                      <td className="py-2.5 px-3 sm:px-4 max-w-[220px]">
+                        <span
+                          className="line-clamp-2 text-slate-700 dark:text-slate-300 font-sans"
+                          title={sku}
+                        >
+                          {sku}
+                        </span>
+                      </td>
+
+                      {/* 5. Customer Email */}
+                      <td className="py-2.5 px-3 sm:px-4 max-w-[220px]">
+                        <span
+                          className="truncate text-slate-600 dark:text-slate-400 font-mono text-[11px] block"
+                          title={email}
+                        >
+                          {email}
+                        </span>
+                      </td>
+
+                      {/* 6. Engraving Status */}
+                      <td className="py-2.5 px-3 sm:px-4">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusBadgeClass} whitespace-nowrap`}
+                          title={status}
+                        >
+                          {status}
+                        </span>
+                      </td>
+
+                      {/* 7. Remark */}
+                      <td className="py-2.5 px-3 sm:px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {remark}
+                      </td>
+
+                      {/* 8. Dispatched */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        {isDispatched ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                            Dispatched
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
+                            Pending
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           ) : (
+            /* Above 50k Orders Table */
             <table className="w-full text-left text-xs border-collapse min-w-[760px]">
               <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 font-semibold uppercase tracking-wider text-[10.5px]">
                 <tr>
