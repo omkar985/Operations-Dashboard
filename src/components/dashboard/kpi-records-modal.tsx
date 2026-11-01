@@ -19,6 +19,7 @@ import {
   PackageCheck,
   ClipboardList,
   Wrench,
+  RotateCcw,
 } from "lucide-react";
 import type { OpsRecord } from "@/types/operations";
 import type { KpiKey, DateRange } from "@/lib/metrics/compute";
@@ -54,6 +55,8 @@ import {
   getKantoAssemblingDueDate,
   isKantoDueDateOverdue,
   isKantoDueDateWithin,
+  isHvcRecord,
+  isHvcPendingOnAttend,
 } from "@/lib/metrics/compute";
 
 interface KpiRecordsModalProps {
@@ -203,6 +206,12 @@ export function KpiRecordsModal({
     if (kpiKey === "unboxed_waiting_process") {
       return records.filter((r) => isUnboxedWaitingOnProcess(r, range));
     }
+    if (kpiKey === "hvc_received") {
+      return records.filter(isHvcRecord);
+    }
+    if (kpiKey === "hvc_pending_attend") {
+      return records.filter(isHvcPendingOnAttend);
+    }
     return records;
   }, [kpiKey, records, range]);
 
@@ -226,6 +235,11 @@ export function KpiRecordsModal({
     return cohortRecords.length > 0 && cohortRecords.every(isUnboxedRecord);
   }, [kpiKey, cohortRecords]);
 
+  const isHvcCohort = useMemo(() => {
+    if (kpiKey?.startsWith("hvc_")) return true;
+    return cohortRecords.length > 0 && cohortRecords.every(isHvcRecord);
+  }, [kpiKey, cohortRecords]);
+
   // Search filter & sort
   const filteredRecords = useMemo(() => {
     let result = cohortRecords;
@@ -245,6 +259,7 @@ export function KpiRecordsModal({
       const q = search.toLowerCase().trim();
       result = result.filter((r) => {
         const orderNo = (
+          getRecordCol(r, "Order Name") ??
           getRecordCol(r, "Order Number") ??
           getRecordCol(r, "Order no.") ??
           getRecordCol(r, "without #") ??
@@ -253,6 +268,7 @@ export function KpiRecordsModal({
           ""
         ).toLowerCase();
         const sku = (
+          getRecordCol(r, "Products") ??
           getRecordCol(r, "Product Name") ??
           getRecordCol(r, "SKU") ??
           ""
@@ -260,15 +276,22 @@ export function KpiRecordsModal({
         const customer = (
           getRecordCol(r, "Customer Name") ??
           getRecordCol(r, "Email id") ??
+          getRecordCol(r, "Email") ??
           getRecordCol(r, "Name") ??
           r.title ??
           ""
         ).toLowerCase();
         const status = (
+          getRecordCol(r, "Result") ||
           getKantoStatus(r) ||
           getRecordCol(r, "Dispatch status") ||
           getRecordCol(r, "Status") ||
           getRecordStatus(r) ||
+          ""
+        ).toLowerCase();
+        const choice = (
+          getRecordCol(r, "Customer Choice") ??
+          getRecordCol(r, "What would you like?") ??
           ""
         ).toLowerCase();
         const assembled = (
@@ -293,6 +316,7 @@ export function KpiRecordsModal({
           sku.includes(q) ||
           customer.includes(q) ||
           status.includes(q) ||
+          choice.includes(q) ||
           assembled.includes(q) ||
           availability.includes(q) ||
           action.includes(q)
@@ -601,6 +625,72 @@ export function KpiRecordsModal({
       return;
     }
 
+    if (isHvcCohort) {
+      const headers = [
+        "Order Number",
+        "Amount (INR)",
+        "Product",
+        "Customer Choice",
+        "Result",
+        "Customer Name",
+        "Customer Email",
+        "Customer Phone",
+        "Reason for Cancellation",
+        "Shopify Admin URL",
+      ];
+
+      const rows = filteredRecords.map((r) => {
+        const orderNo =
+          getRecordCol(r, "Order Name") ??
+          getRecordCol(r, "Order Number") ??
+          getRecordCol(r, "Order no.") ??
+          r.title ??
+          r.id ??
+          "";
+        const cleanId = orderNo.replace(/^#/, "").trim();
+        const amt = getRecordAmount(r) ?? 0;
+        const product = (getRecordCol(r, "Products") ?? getRecordCol(r, "Product") ?? "").trim();
+        const choice = (
+          getRecordCol(r, "Customer Choice") ??
+          getRecordCol(r, "What would you like?") ??
+          ""
+        ).trim();
+        const result = (getRecordCol(r, "Result") ?? "Pending Action").trim();
+        const custName = (getRecordCol(r, "Customer Name") ?? "").trim();
+        const email = (getRecordCol(r, "Email") ?? "").trim();
+        const phone = (getRecordCol(r, "Customer Phone") ?? "").trim();
+        const reason = (getRecordCol(r, "Please share the reason for cancellation") ?? "").trim();
+        const rawShopifyLink = (getRecordCol(r, "Shopify Order Link") ?? "").trim();
+        const shopifyUrl =
+          rawShopifyLink && rawShopifyLink.startsWith("http")
+            ? rawShopifyLink
+            : `https://admin.shopify.com/store/headphonezone/orders?query=${encodeURIComponent(cleanId)}`;
+
+        return [
+          `"${orderNo.replace(/"/g, '""')}"`,
+          amt,
+          `"${product.replace(/"/g, '""')}"`,
+          `"${choice.replace(/"/g, '""')}"`,
+          `"${result.replace(/"/g, '""')}"`,
+          `"${custName.replace(/"/g, '""')}"`,
+          `"${email.replace(/"/g, '""')}"`,
+          `"${phone.replace(/"/g, '""')}"`,
+          `"${reason.replace(/"/g, '""')}"`,
+          `"${shopifyUrl}"`,
+        ].join(",");
+      });
+
+      const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${kpiTitle.toLowerCase().replace(/\s+/g, "-")}-high-value-cancellations.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
     const headers = [
       "Order Number",
       "Order Date",
@@ -667,7 +757,9 @@ export function KpiRecordsModal({
 
   // Icon corresponding to current cohort
   const HeaderIcon =
-    kpiKey === "not_yet_processed"
+    kpiKey === "hvc_received" || kpiKey === "hvc_pending_attend"
+      ? RotateCcw
+      : kpiKey === "not_yet_processed"
       ? Clock
       : kpiKey === "not_yet_delivered"
       ? Truck
@@ -692,10 +784,13 @@ export function KpiRecordsModal({
       : Layers;
 
   const headerTheme =
-    kpiKey === "not_yet_processed" ||
-    kpiKey === "vmoda_waiting_engraving" ||
-    kpiKey === "demo_received_not_processed" ||
-    kpiKey === "kanto_waiting_assembly"
+    kpiKey === "hvc_received"
+      ? "text-rose-500 bg-rose-500/10 border-rose-500/20"
+      : kpiKey === "hvc_pending_attend" ||
+        kpiKey === "not_yet_processed" ||
+        kpiKey === "vmoda_waiting_engraving" ||
+        kpiKey === "demo_received_not_processed" ||
+        kpiKey === "kanto_waiting_assembly"
       ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
       : kpiKey === "not_yet_delivered" || kpiKey === "kanto_waiting_process"
       ? "text-indigo-500 bg-indigo-500/10 border-indigo-500/20"
@@ -739,7 +834,11 @@ export function KpiRecordsModal({
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {isKantoCohort
+                {isHvcCohort
+                  ? "High Value Cancellations"
+                  : isUnboxedCohort
+                  ? "Unboxed Products"
+                  : isKantoCohort
                   ? "Kanto Products"
                   : isDemoCohort
                   ? "Demo Units To be Dispatch"
@@ -1592,6 +1691,149 @@ export function KpiRecordsModal({
                         ) : (
                           <span className="text-slate-400 dark:text-slate-500 text-[11px]">—</span>
                         )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : isHvcCohort ? (
+            /* High Value Cancellations Table */
+            <table className="w-full text-left text-xs border-collapse min-w-[760px]">
+              <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 font-semibold uppercase tracking-wider text-[10.5px]">
+                <tr>
+                  <th className="py-2.5 px-3 sm:px-4">Order Number</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-right">Amount</th>
+                  <th className="py-2.5 px-3 sm:px-4">Product</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Customer Choice</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Result</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                {filteredRecords.map((r, i) => {
+                  const rawOrderNo =
+                    getRecordCol(r, "Order Name") ??
+                    getRecordCol(r, "Order Number") ??
+                    getRecordCol(r, "Order no.") ??
+                    r.title ??
+                    r.id ??
+                    `Row ${r.row}`;
+                  const cleanOrderId = String(rawOrderNo).replace(/^#/, "").trim();
+                  const rawShopifyLink = (getRecordCol(r, "Shopify Order Link") ?? "").trim();
+                  const shopifyUrl =
+                    rawShopifyLink && rawShopifyLink.startsWith("http")
+                      ? rawShopifyLink
+                      : `https://admin.shopify.com/store/headphonezone/orders?query=${encodeURIComponent(
+                          cleanOrderId
+                        )}`;
+
+                  const amt = getRecordAmount(r);
+                  const product = (getRecordCol(r, "Products") ?? getRecordCol(r, "Product") ?? "—").trim();
+                  const customerChoice = (
+                    getRecordCol(r, "Customer Choice") ??
+                    getRecordCol(r, "What would you like?") ??
+                    "—"
+                  ).trim();
+                  const result = (getRecordCol(r, "Result") ?? "").trim();
+                  const isResultBlank = !result || result.toLowerCase() === "(blank)";
+
+                  const isRefund = customerChoice.toLowerCase().includes("refund");
+                  const isStoreCredit = customerChoice.toLowerCase().includes("credit");
+
+                  return (
+                    <tr
+                      key={`${r.row}-${i}`}
+                      className="group hover:bg-sky-500/[0.04] dark:hover:bg-sky-500/[0.06] transition-colors"
+                    >
+                      {/* 1. Order Number */}
+                      <td className="py-2.5 px-3 sm:px-4 font-mono font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            href={shopifyUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-[#0284C7] dark:hover:text-[#38BDF8] underline decoration-slate-300 dark:decoration-slate-700 underline-offset-2 transition-colors flex items-center gap-1"
+                            title="Open in Shopify Admin"
+                          >
+                            {rawOrderNo}
+                            <ExternalLink className="w-3 h-3 opacity-60 group-hover:opacity-100" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(cleanOrderId)}
+                            title="Copy Order ID"
+                            className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                          >
+                            {copiedId === cleanOrderId ? (
+                              <Check className="w-3 h-3 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* 2. Amount */}
+                      <td className="py-2.5 px-3 sm:px-4 text-right font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                        {amt !== null ? `₹${amt.toLocaleString("en-IN")}` : "—"}
+                      </td>
+
+                      {/* 3. Product */}
+                      <td
+                        className="py-2.5 px-3 sm:px-4 text-slate-700 dark:text-slate-300 max-w-[280px] truncate"
+                        title={product}
+                      >
+                        {product}
+                      </td>
+
+                      {/* 4. Customer Choice */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        {isRefund ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 dark:bg-sky-950/50 text-[#0284C7] dark:text-[#38BDF8] border border-sky-200/80 dark:border-sky-800/50">
+                            Refund
+                          </span>
+                        ) : isStoreCredit ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/50">
+                            Store Credit
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-500 italic text-[11px]">
+                            {customerChoice || "—"}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 5. Result */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        {isResultBlank ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/50">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            Pending Action
+                          </span>
+                        ) : (
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-semibold border ${
+                              result.toLowerCase().includes("refund")
+                                ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/50"
+                                : "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200/80 dark:border-blue-800/50"
+                            }`}
+                          >
+                            {result}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 6. Action */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        <a
+                          href={shopifyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0284C7] dark:text-[#38BDF8] hover:underline"
+                        >
+                          View Order <ExternalLink className="w-3 h-3" />
+                        </a>
                       </td>
                     </tr>
                   );

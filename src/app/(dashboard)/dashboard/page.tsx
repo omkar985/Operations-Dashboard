@@ -9,11 +9,13 @@ import {
   computeDemoKpis,
   computeKantoKpis,
   computeUnboxedKpis,
+  computeHvcKpis,
   isAbove50kRecord,
   isVModaRecord,
   isDemoRecord,
   isKantoRecord,
   isUnboxedRecord,
+  isHvcRecord,
   type MetricsConfig,
 } from "@/lib/metrics/compute";
 import type { FieldKey } from "@/types/operations";
@@ -22,6 +24,7 @@ import { VModaSection } from "@/components/dashboard/vmoda-section";
 import { DemoSection } from "@/components/dashboard/demo-section";
 import { KantoSection } from "@/components/dashboard/kanto-section";
 import { UnboxedSection } from "@/components/dashboard/unboxed-section";
+import { HvcSection } from "@/components/dashboard/hvc-section";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LiveRefreshHeader } from "@/components/dashboard/live-refresh-header";
@@ -114,12 +117,14 @@ export default async function DashboardPage(props: DashboardPageProps) {
   const demoRecords = dataset.records.filter(isDemoRecord);
   const kantoRecords = dataset.records.filter(isKantoRecord);
   const unboxedRecords = dataset.records.filter(isUnboxedRecord);
+  const hvcRecords = dataset.records.filter(isHvcRecord);
 
   const above50kKpis = computeKpis(above50kRecords, parsedRange, metricsConfig);
   const vmodaKpis = computeVModaKpis(dataset.records, parsedRange, metricsConfig);
   const demoKpis = computeDemoKpis(dataset.records, parsedRange, metricsConfig);
   const kantoKpis = computeKantoKpis(dataset.records, parsedRange, metricsConfig);
   const unboxedKpis = computeUnboxedKpis(dataset.records, parsedRange, metricsConfig);
+  const hvcKpis = computeHvcKpis(dataset.records, parsedRange, metricsConfig);
 
   const exportUrl = `/api/operations/export?range=${encodeURIComponent(
     parsedRange.key
@@ -183,6 +188,9 @@ export default async function DashboardPage(props: DashboardPageProps) {
 
       {/* Unboxed Products Section with Glassmorphic Cards & Drill-down Modal */}
       <UnboxedSection records={unboxedRecords} kpis={unboxedKpis} range={parsedRange} />
+
+      {/* High Value Cancellations Section with Glassmorphic Cards & Drill-down Modal */}
+      <HvcSection records={hvcRecords} kpis={hvcKpis} range={parsedRange} />
     </div>
   );
 }

@@ -260,6 +260,35 @@ const KPI_CONFIG: Record<
       },
     ],
   },
+  hvc_received: {
+    icon: RotateCcw,
+    tag: "Received in a week",
+    tagStyle: "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border-rose-200/80 dark:border-rose-800/50",
+    iconStyle: "text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20",
+    glowGradient: "from-rose-500/8 via-rose-500/3 to-transparent",
+    sparklineColor: "#F43F5E",
+    sublabel: "Weekly intake & customer choice",
+    filterTitle: "High Value Cancellations Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"High Value Cancellations"' },
+      { label: "Secondary Lookup", value: '"Request Cancellation Data " by Order Name' },
+      { label: "Breakdown Filter", value: '"What would you like?" = Refund vs Store Credit' },
+    ],
+  },
+  hvc_pending_attend: {
+    icon: Clock,
+    tag: "Not Yet Attended",
+    tagStyle: "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/50",
+    iconStyle: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20",
+    glowGradient: "from-amber-500/8 via-amber-500/3 to-transparent",
+    sparklineColor: "#F59E0B",
+    sublabel: "Awaiting ops attendance",
+    filterTitle: "Pending on Attend Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"High Value Cancellations"' },
+      { label: "Result Column", value: 'Column "Result" is Blank' },
+    ],
+  },
 };
 
 export function KpiLedger({ kpis, className = "", onCardClick }: KpiLedgerProps) {
@@ -427,6 +456,20 @@ export function KpiLedger({ kpis, className = "", onCardClick }: KpiLedgerProps)
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/50">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         Within Due: {kpi.withinDueCount}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Optional Breakdown for High Value Cancellations */}
+                  {kpi.refundCount !== undefined && kpi.storeCreditCount !== undefined && (
+                    <div className="flex items-center gap-1.5 mt-2.5">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-sky-50 dark:bg-sky-950/50 text-[#0284C7] dark:text-[#38BDF8] border border-sky-200/80 dark:border-sky-800/50">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#0284C7]" />
+                        Refund: {kpi.refundCount}
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/50">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                        Store Credit: {kpi.storeCreditCount}
                       </span>
                     </div>
                   )}

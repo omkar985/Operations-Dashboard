@@ -58,11 +58,12 @@ async function accessToken(): Promise<string> {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function request<T>(path: string, params: Record<string, string | string[]> = {}): Promise<T> {
+async function request<T>(path: string, params: Record<string, string | string[]> = {}, spreadsheetId?: string): Promise<T> {
   const cfg = getSheetsConfig();
   if (!cfg) throw new SheetsError("NOT_CONFIGURED", "Google Sheets credentials are not configured.");
 
-  const url = new URL(`${BASE}/${encodeURIComponent(cfg.spreadsheetId)}${path}`);
+  const targetSpreadsheetId = spreadsheetId || cfg.spreadsheetId;
+  const url = new URL(`${BASE}/${encodeURIComponent(targetSpreadsheetId)}${path}`);
   for (const [k, v] of Object.entries(params)) {
     for (const item of Array.isArray(v) ? v : [v]) url.searchParams.append(k, item);
   }
@@ -125,11 +126,11 @@ export interface SpreadsheetInfo {
   worksheets: WorksheetInfo[];
 }
 
-export async function getSpreadsheetInfo(): Promise<SpreadsheetInfo> {
+export async function getSpreadsheetInfo(spreadsheetId?: string): Promise<SpreadsheetInfo> {
   const data = await request<{
     properties?: { title?: string };
     sheets?: { properties: { title: string; gridProperties?: { rowCount?: number; columnCount?: number } } }[];
-  }>("", { fields: "properties.title,sheets.properties(title,gridProperties(rowCount,columnCount))" });
+  }>("", { fields: "properties.title,sheets.properties(title,gridProperties(rowCount,columnCount))" }, spreadsheetId);
   return {
     title: data.properties?.title ?? "Spreadsheet",
     worksheets: (data.sheets ?? []).map((s) => ({
@@ -163,16 +164,16 @@ const RENDER = {
   majorDimension: "ROWS",
 };
 
-async function readRange(a1: string): Promise<CellValue[][]> {
-  const data = await request<ValueRange>(`/values/${encodeURIComponent(a1)}`, RENDER);
+async function readRange(a1: string, spreadsheetId?: string): Promise<CellValue[][]> {
+  const data = await request<ValueRange>(`/values/${encodeURIComponent(a1)}`, RENDER, spreadsheetId);
   return data.values ?? [];
 }
 
-export async function readRows(ws: WorksheetInfo, firstRow: number, lastRow: number): Promise<CellValue[][]> {
+export async function readRows(ws: WorksheetInfo, firstRow: number, lastRow: number, spreadsheetId?: string): Promise<CellValue[][]> {
   const cols = Math.max(ws.columnCount, 1);
   const last = Math.min(lastRow, ws.rowCount);
   if (firstRow > last) return [];
-  return readRange(`${quoteTitle(ws.title)}!A${firstRow}:${columnLetter(cols)}${last}`);
+  return readRange(`${quoteTitle(ws.title)}!A${firstRow}:${columnLetter(cols)}${last}`, spreadsheetId);
 }
 
 export interface PagedRead {
@@ -185,10 +186,10 @@ export interface PagedRead {
  * Reads the header row and then the data in fixed-size row chunks bounded by the worksheet's grid size
  * (so a blank gap inside the data can never end pagination early).
  */
-export async function readWorksheet(ws: WorksheetInfo, headerRow: number, opts: { chunkSize?: number; maxRows?: number } = {}): Promise<PagedRead> {
+export async function readWorksheet(ws: WorksheetInfo, headerRow: number, opts: { chunkSize?: number; maxRows?: number; spreadsheetId?: string } = {}): Promise<PagedRead> {
   const chunk = opts.chunkSize ?? 2000;
   const maxRows = opts.maxRows ?? 100_000;
-  const headers = (await readRows(ws, headerRow, headerRow))[0] ?? [];
+  const headers = (await readRows(ws, headerRow, headerRow, opts.spreadsheetId))[0] ?? [];
   const rows: CellValue[][] = [];
   let start = headerRow + 1;
   let truncated = false;
@@ -198,10 +199,27 @@ export async function readWorksheet(ws: WorksheetInfo, headerRow: number, opts: 
       break;
     }
     const end = Math.min(start + chunk - 1, ws.rowCount);
-    const part = await readRows(ws, start, end);
+    const part = await readRows(ws, start, end, opts.spreadsheetId);
     // The API trims trailing empty rows; pad so row numbers stay aligned with the sheet.
     for (let i = 0; i < end - start + 1; i++) rows.push(part[i] ?? []);
     start = end + 1;
   }
   return { headers, rows, truncated };
+}
+
+/**
+ * Fetches an entire worksheet by sheet title from an arbitrary spreadsheet ID.
+ * Matches title case-insensitively and tolerates whitespace trimming.
+ */
+export async function fetchWorksheetByTitle(
+  spreadsheetId: string,
+  worksheetTitle: string,
+  headerRow: number = 1
+): Promise<PagedRead | null> {
+  const info = await getSpreadsheetInfo(spreadsheetId);
+  const targetWs =
+    info.worksheets.find((w) => w.title === worksheetTitle) ??
+    info.worksheets.find((w) => w.title.trim().toLowerCase() === worksheetTitle.trim().toLowerCase());
+  if (!targetWs) return null;
+  return readWorksheet(targetWs, headerRow, { spreadsheetId });
 }

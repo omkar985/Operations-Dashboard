@@ -117,9 +117,41 @@ export function isUnboxedRecord(r: OpsRecord): boolean {
   return false;
 }
 
+/** Checks if a record belongs to the High Value Cancellations subsheet. */
+export function isHvcRecord(r: OpsRecord): boolean {
+  if (r.subsheet) {
+    const s = r.subsheet.toLowerCase().trim();
+    if (s.includes("high value") || s.includes("cancellation")) return true;
+  }
+  if (r.raw) {
+    return Boolean(
+      getRecordCol(r, "Please share the reason for cancellation") !== null ||
+      getRecordCol(r, "Submission ID") !== null ||
+      (getRecordCol(r, "What would you like?") !== null && getRecordCol(r, "Result") !== null)
+    );
+  }
+  return false;
+}
+
 /** Checks if a record belongs to the Above 50k Orders subsheet. */
 export function isAbove50kRecord(r: OpsRecord): boolean {
-  return !isVModaRecord(r) && !isDemoRecord(r) && !isKantoRecord(r) && !isUnboxedRecord(r);
+  return (
+    !isVModaRecord(r) &&
+    !isDemoRecord(r) &&
+    !isKantoRecord(r) &&
+    !isUnboxedRecord(r) &&
+    !isHvcRecord(r)
+  );
+}
+
+/**
+ * High Value Cancellations: Pending on Attend
+ * Criteria: "Result" column is blank (not yet attended)
+ */
+export function isHvcPendingOnAttend(r: OpsRecord): boolean {
+  if (!isHvcRecord(r)) return false;
+  const result = getRecordCol(r, "Result");
+  return !result || result.trim() === "" || result.trim().toLowerCase() === "(blank)";
 }
 
 /**
@@ -558,6 +590,8 @@ export type KpiKey =
   | "kanto_dispatched"
   | "unboxed_waiting_confirmation"
   | "unboxed_waiting_process"
+  | "hvc_received"
+  | "hvc_pending_attend"
   | "open"
   | "created"
   | "resolved"
@@ -591,6 +625,9 @@ export interface Kpi {
   /** Breakdown for Kanto Waiting on Process */
   overdueCount?: number;
   withinDueCount?: number;
+  /** Breakdown for High Value Cancellations */
+  refundCount?: number;
+  storeCreditCount?: number;
 }
 
 function mk(
@@ -1206,6 +1243,112 @@ export function computeUnboxedKpis(
   });
 
   return [waitingConfirmation, waitingProcess];
+}
+
+export function computeHvcKpis(
+  records: OpsRecord[],
+  range: DateRange,
+  cfg: MetricsConfig,
+): Kpi[] {
+  const hvcRecords = records.filter(isHvcRecord);
+  const prev = previousRange(range);
+  const starts = bucketStarts(range);
+  const step = granularityFor(range) === "day" ? DAY : 7 * DAY;
+
+  // 1. No. of High Value Cancellations (Received in a week)
+  // Breakdown of Store Credit and Refund
+  let refundCount = 0;
+  let storeCreditCount = 0;
+
+  hvcRecords.forEach((r) => {
+    const choice = (
+      getRecordCol(r, "Customer Choice") ??
+      getRecordCol(r, "What would you like?") ??
+      ""
+    ).toLowerCase();
+    if (choice.includes("refund")) {
+      refundCount++;
+    } else if (choice.includes("credit")) {
+      storeCreditCount++;
+    }
+  });
+
+  const totalHvcAmt = hvcRecords.reduce((sum, r) => sum + (getRecordAmount(r) ?? 0), 0);
+
+  const hvcReceived = mk(
+    {
+      key: "hvc_received",
+      label: "No. of High Value Cancellations",
+      definition:
+        'High Value Cancellations received with breakdown of Refund and Store Credit looked up from "Request Cancellation Data ".',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg
+  );
+  hvcReceived.available = true;
+  hvcReceived.value = hvcRecords.length;
+  hvcReceived.totalAmount = totalHvcAmt;
+  hvcReceived.refundCount = refundCount;
+  hvcReceived.storeCreditCount = storeCreditCount;
+
+  const curInRange = hvcRecords.filter((r) => isMonthlyReceived(r, range, cfg.now)).length;
+  const prevInRange = hvcRecords.filter((r) => isMonthlyReceived(r, prev, cfg.now)).length;
+  hvcReceived.previous = prevInRange;
+  hvcReceived.deltaPct = pctDelta(curInRange, prevInRange);
+  hvcReceived.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return hvcRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi;
+    }).length;
+  });
+
+  // 2. Pending on Attend (Not Yet Attended)
+  // Filter: "Result" column is blank
+  const pendingAttendOrders = hvcRecords.filter(isHvcPendingOnAttend);
+  const pendingAttendTotalAmt = pendingAttendOrders.reduce(
+    (sum, r) => sum + (getRecordAmount(r) ?? 0),
+    0
+  );
+
+  const pendingAttend = mk(
+    {
+      key: "hvc_pending_attend",
+      label: "Pending on Attend",
+      definition: 'High Value Cancellations where "Result" column is blank (not yet attended).',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg
+  );
+  pendingAttend.available = true;
+  pendingAttend.value = pendingAttendOrders.length;
+  pendingAttend.totalAmount = pendingAttendTotalAmt;
+
+  const curPendingInRange = hvcRecords.filter(
+    (r) => isMonthlyReceived(r, range, cfg.now) && isHvcPendingOnAttend(r)
+  ).length;
+  const prevPendingInRange = hvcRecords.filter(
+    (r) => isMonthlyReceived(r, prev, cfg.now) && isHvcPendingOnAttend(r)
+  ).length;
+  pendingAttend.previous = prevPendingInRange;
+  pendingAttend.deltaPct = pctDelta(curPendingInRange, prevPendingInRange);
+  pendingAttend.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return hvcRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi && isHvcPendingOnAttend(r);
+    }).length;
+  });
+
+  return [hvcReceived, pendingAttend];
 }
 
 // ----------------------------------------------------------------------------- trend

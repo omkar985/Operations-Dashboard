@@ -31,6 +31,8 @@ const serverSchema = z.object({
   GOOGLE_SHEETS_SPREADSHEET_ID: opt(z.string().min(10)),
   GOOGLE_SHEETS_WORKSHEET: opt(z.string().min(1)),
   GOOGLE_SHEETS_WORKSHEETS: opt(z.string().min(1)),
+  GOOGLE_SHEETS_CANCELLATIONS_SPREADSHEET_ID: opt(z.string().min(10)),
+  GOOGLE_SHEETS_CANCELLATIONS_WORKSHEET: opt(z.string().min(1)),
   GOOGLE_SERVICE_ACCOUNT_EMAIL: opt(z.email()),
   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: opt(z.string().min(100)),
 
@@ -116,6 +118,8 @@ export interface SheetsConfig {
   privateKey: string;
   defaultWorksheet?: string;
   worksheets?: string[];
+  cancellationsSpreadsheetId?: string;
+  cancellationsWorksheet?: string;
 }
 
 /** Returns null when Google Sheets is not configured (the app then shows a connection state). */
@@ -138,6 +142,8 @@ export function getSheetsConfig(): SheetsConfig | null {
     privateKey: e.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/^"|"$/g, "").replace(/\\n/g, "\n"),
     defaultWorksheet: defaultWs,
     worksheets,
+    cancellationsSpreadsheetId: e.GOOGLE_SHEETS_CANCELLATIONS_SPREADSHEET_ID,
+    cancellationsWorksheet: e.GOOGLE_SHEETS_CANCELLATIONS_WORKSHEET,
   };
 }
 

@@ -33,6 +33,9 @@ import {
   isUnboxedWaitingOnProcess,
   getUnboxedConfirmationDueDate,
   computeUnboxedKpis,
+  isHvcRecord,
+  isHvcPendingOnAttend,
+  computeHvcKpis,
   type MetricsConfig,
   type DateRange,
 } from "@/lib/metrics/compute";
@@ -1147,6 +1150,156 @@ describe("Metrics Pure Function Calculations", () => {
       expect(procKpi).toBeDefined();
       expect(procKpi?.value).toBe(1);
       expect(procKpi?.totalAmount).toBe(9999);
+    });
+  });
+
+  describe("High Value Cancellations Cohort", () => {
+    const hvcRecords: OpsRecord[] = [
+      {
+        row: 2,
+        subsheet: "High Value Cancellations",
+        id: "1090001",
+        title: "Order 1090001",
+        status: null,
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order ID": "1090001",
+          "Order Name": "#1090001",
+          "Customer Name": "Rahul Sharma",
+          "Customer Phone": "+91 9876543210",
+          "Email": "rahul@example.com",
+          "Total": "52,490.00",
+          "Products": "Sennheiser HD 660S2",
+          "Payment Gateway": "Razorpay",
+          "Please share the reason for cancellation": "Found better price",
+          "What would you like?": "Refund",
+          "Customer Choice": "Refund",
+          "Result": "Refunded",
+        },
+      },
+      {
+        row: 3,
+        subsheet: "High Value Cancellations",
+        id: "1090002",
+        title: "Order 1090002",
+        status: null,
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order ID": "1090002",
+          "Order Name": "#1090002",
+          "Customer Name": "Priya Patel",
+          "Customer Phone": "+91 9876543211",
+          "Email": "priya@example.com",
+          "Total": "64,990.00",
+          "Products": "Hifiman Arya Organic",
+          "Payment Gateway": "PayU",
+          "Please share the reason for cancellation": "Ordered wrong color",
+          "What would you like?": "Store Credit",
+          "Customer Choice": "Store Credit",
+          "Result": "", // Blank -> Pending on Attend
+        },
+      },
+      {
+        row: 4,
+        subsheet: "High Value Cancellations",
+        id: "1090003",
+        title: "Order 1090003",
+        status: null,
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order ID": "1090003",
+          "Order Name": "#1090003",
+          "Customer Name": "Amit Kumar",
+          "Customer Phone": "+91 9876543212",
+          "Email": "amit@example.com",
+          "Total": "72,000.00",
+          "Products": "Focal Clear Mg",
+          "Payment Gateway": "Simpl",
+          "Please share the reason for cancellation": "Delayed delivery",
+          "What would you like?": "Refund",
+          "Customer Choice": "Refund",
+          "Result": "Salvaged",
+        },
+      },
+      {
+        row: 5,
+        subsheet: "High Value Cancellations",
+        id: "1090004",
+        title: "Order 1090004",
+        status: null,
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order ID": "1090004",
+          "Order Name": "#1090004",
+          "Customer Name": "Sneha Gupta",
+          "Customer Phone": "+91 9876543213",
+          "Email": "sneha@example.com",
+          "Total": "55,000.00",
+          "Products": "Audeze LCD-X",
+          "Payment Gateway": "Cashfree",
+          "Please share the reason for cancellation": "Changed mind",
+          "What would you like?": "Store Credit",
+          "Customer Choice": "Store Credit",
+          "Result": "(blank)", // Blank -> Pending on Attend
+        },
+      },
+    ];
+
+    it("correctly identifies High Value Cancellations records and excludes them from Above 50k", () => {
+      expect(isHvcRecord(hvcRecords[0])).toBe(true);
+      expect(isAbove50kRecord(hvcRecords[0])).toBe(false);
+      expect(isVModaRecord(hvcRecords[0])).toBe(false);
+      expect(isDemoRecord(hvcRecords[0])).toBe(false);
+      expect(isKantoRecord(hvcRecords[0])).toBe(false);
+      expect(isUnboxedRecord(hvcRecords[0])).toBe(false);
+    });
+
+    it("identifies Pending on Attend when Result column is blank or empty", () => {
+      expect(isHvcPendingOnAttend(hvcRecords[0])).toBe(false); // Result: Refunded
+      expect(isHvcPendingOnAttend(hvcRecords[1])).toBe(true);  // Result: ""
+      expect(isHvcPendingOnAttend(hvcRecords[2])).toBe(false); // Result: Salvaged
+      expect(isHvcPendingOnAttend(hvcRecords[3])).toBe(true);  // Result: "(blank)"
+    });
+
+    it("computes accurate High Value Cancellations KPIs with refund and store credit breakdown", () => {
+      const kpis = computeHvcKpis(hvcRecords, range, config);
+      expect(kpis.length).toBe(2);
+
+      const receivedKpi = kpis.find((k) => k.key === "hvc_received");
+      expect(receivedKpi).toBeDefined();
+      expect(receivedKpi?.value).toBe(4);
+      expect(receivedKpi?.refundCount).toBe(2);
+      expect(receivedKpi?.storeCreditCount).toBe(2);
+      expect(receivedKpi?.totalAmount).toBe(52490 + 64990 + 72000 + 55000);
+
+      const pendingKpi = kpis.find((k) => k.key === "hvc_pending_attend");
+      expect(pendingKpi).toBeDefined();
+      expect(pendingKpi?.value).toBe(2);
+      expect(pendingKpi?.totalAmount).toBe(64990 + 55000);
     });
   });
 });

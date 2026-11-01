@@ -2,8 +2,9 @@ import "server-only";
 import { AppError, isAppError } from "@/lib/errors";
 import { log } from "@/lib/logger";
 import { getSheetsConfig } from "@/lib/env";
-import { mapRows, mappingFingerprint } from "@/lib/google-sheets/mapping";
-import { getSpreadsheetInfo, readWorksheet, SheetsError } from "@/server/integrations/google-sheets";
+import { mapRows, mappingFingerprint, normalizeHeader, getRecordCol } from "@/lib/google-sheets/mapping";
+import { getSpreadsheetInfo, readWorksheet, fetchWorksheetByTitle, SheetsError } from "@/server/integrations/google-sheets";
+import { isHvcRecord } from "@/lib/metrics/compute";
 import { getSheetMapping } from "@/server/services/settings-service";
 import { enqueueNotification } from "@/server/repositories/outbox";
 import { deliver } from "@/server/services/notification-service";
@@ -116,6 +117,68 @@ export async function runSync(opts: { trigger: SyncTrigger; actor?: SessionUser 
     }
     if (allRecords.length === 0 && allRowsRead > 0) {
       warnings.push({ code: "NO_MAPPED_VALUES", message: "Rows were read but none contained values in the mapped columns." });
+    }
+
+    // High Value Cancellations: enrich records by looking up "What would you like?" from secondary sheet
+    if (allRecords.some(isHvcRecord)) {
+      try {
+        const secSpreadsheetId =
+          cfg?.cancellationsSpreadsheetId ||
+          process.env.GOOGLE_SHEETS_CANCELLATIONS_SPREADSHEET_ID?.trim() ||
+          "1R2aB21rRqoqRwLjDEyiiquiVcP5D76MCtAsSb087Us4";
+        const secWorksheetName =
+          cfg?.cancellationsWorksheet ||
+          process.env.GOOGLE_SHEETS_CANCELLATIONS_WORKSHEET?.trim() ||
+          "Request Cancellation Data ";
+
+        const secRead = await fetchWorksheetByTitle(secSpreadsheetId, secWorksheetName, mapping.headerRow);
+        if (secRead && secRead.headers.length > 0) {
+          const orderColIdx = secRead.headers.findIndex((h) => {
+            const norm = normalizeHeader(h);
+            return norm === "order name" || norm === "order number" || norm === "order id";
+          });
+          const choiceColIdx = secRead.headers.findIndex((h) => {
+            const norm = normalizeHeader(h);
+            return norm === "what would you like?" || norm === "customer choice";
+          });
+
+          if (orderColIdx >= 0 && choiceColIdx >= 0) {
+            const choiceMap = new Map<string, string>();
+            for (const row of secRead.rows) {
+              const ord = String(row[orderColIdx] ?? "").trim();
+              const choice = String(row[choiceColIdx] ?? "").trim();
+              if (ord && choice) {
+                choiceMap.set(ord.toLowerCase(), choice);
+                const numOnly = ord.replace(/[^0-9]/g, "");
+                if (numOnly) choiceMap.set(numOnly, choice);
+              }
+            }
+
+            for (const r of allRecords) {
+              if (!isHvcRecord(r)) continue;
+              const ord =
+                getRecordCol(r, "Order Name") ??
+                getRecordCol(r, "Order Number") ??
+                r.id ??
+                "";
+              const numOnly = String(ord).replace(/[^0-9]/g, "");
+              const lookedUp =
+                choiceMap.get(String(ord).trim().toLowerCase()) ??
+                (numOnly ? choiceMap.get(numOnly) : undefined);
+
+              if (!r.raw) r.raw = {};
+              const finalChoice = lookedUp || r.raw["What would you like?"] || r.raw["Customer Choice"] || "";
+              r.raw["Customer Choice"] = finalChoice;
+              r.raw["What would you like?"] = finalChoice;
+            }
+            log.info("hvc_cancellation_data_enriched", { enrichedCount: choiceMap.size });
+          }
+        }
+      } catch (secErr) {
+        log.warn("hvc_cancellation_enrichment_failed", {
+          error: secErr instanceof Error ? secErr.message : String(secErr),
+        });
+      }
     }
 
     const snapshotId = await insertSnapshot({
