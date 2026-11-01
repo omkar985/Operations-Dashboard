@@ -1,5 +1,5 @@
 import type { FieldKey, OpsRecord } from "@/types/operations";
-import { getRecordCol, getRecordStatus, parseSheetDate } from "@/lib/google-sheets/mapping";
+import { getRecordCol, getRecordStatus, parseSheetDate, serialToIso } from "@/lib/google-sheets/mapping";
 
 /**
  * Operational metrics — pure functions over normalised records.
@@ -65,91 +65,200 @@ export function isVModaRecord(r: OpsRecord): boolean {
   return false;
 }
 
+/** Checks if a record belongs to the Demo Units subsheet. */
+export function isDemoRecord(r: OpsRecord): boolean {
+  if (r.subsheet) {
+    const s = r.subsheet.toLowerCase().trim();
+    if (s.includes("demo")) return true;
+  }
+  if (r.raw) {
+    return Boolean(
+      getRecordCol(r, "Inspection & Check Status") !== null ||
+      getRecordCol(r, "Generate AWB?") !== null ||
+      getRecordCol(r, "Product page link") !== null ||
+      getRecordCol(r, "Ship Label Link") !== null
+    );
+  }
+  return false;
+}
+
 /** Checks if a record belongs to the Above 50k Orders subsheet. */
 export function isAbove50kRecord(r: OpsRecord): boolean {
-  return !isVModaRecord(r);
+  return !isVModaRecord(r) && !isDemoRecord(r);
 }
 
 /**
- * Filter 1: Not Yet Processed
- * Criteria: "Action taken" is Blank AND status does not contain "cancelled"
+ * Filter 1: Not Yet Processed (Pending Processing)
+ * Criteria: "Action taken" is Blank AND status does not contain "cancelled" OR "SKU not mapped".
+ * Optional range filter: Current month or based on filter applied.
  */
-export function isNotYetProcessed(r: OpsRecord): boolean {
+export function isNotYetProcessed(r: OpsRecord, range?: DateRange, now?: Date): boolean {
+  if (range && !isMonthlyReceived(r, range, now)) {
+    return false;
+  }
   const actionTaken = getRecordCol(r, "Action taken");
   const isActionBlank = !actionTaken || actionTaken.trim() === "";
-  const status = getRecordStatus(r).toLowerCase();
+  const status = getRecordStatus(r).toLowerCase().trim();
   const notCancelled = !status.includes("cancel");
-  return isActionBlank && notCancelled;
+  const notSkuUnmapped = !status.includes("sku not mapped");
+  return isActionBlank && notCancelled && notSkuUnmapped;
 }
 
 /**
- * Filter 2: Not Yet Delivered
- * Criteria: "Delivered yes/no)" column is not set to "Yes" AND "status" column does not contain "Delivered", "RTO", or "Returns"
+ * Filter 2: Not Yet Delivered (Pending Delivery)
+ * Criteria: "Delivered yes/no)" column is not set to "Yes" AND "status" does not contain word "RTO" OR "Return".
+ * Optional range filter: Current month or based on filter applied.
  */
-export function isNotYetDelivered(r: OpsRecord): boolean {
+export function isNotYetDelivered(r: OpsRecord, range?: DateRange, now?: Date): boolean {
+  if (range && !isMonthlyReceived(r, range, now)) {
+    return false;
+  }
   const delivered = getRecordCol(r, "Delivered yes/no)");
   const isDeliveredNotYes = (delivered ?? "").trim().toLowerCase() !== "yes";
-  const status = getRecordStatus(r).toLowerCase();
-  const notDeliveredOrRtoOrReturns = !/delivered|rto|return/i.test(status);
-  return isDeliveredNotYes && notDeliveredOrRtoOrReturns;
+  const status = getRecordStatus(r).toLowerCase().trim();
+  const notDeliveredOrRtoOrReturn = !/delivered|rto|return/i.test(status);
+  return isDeliveredNotYes && notDeliveredOrRtoOrReturn;
 }
 
 /**
  * V-MODA Filter 1: Waiting on Customer
- * Criteria: Status column contains "Waiting on Customer"
+ * Criteria: In V-MODA Sheet "Status" column has value set to "Waiting on Customer"
  */
 export function isWaitingOnCustomer(r: OpsRecord): boolean {
+  if (!isVModaRecord(r)) return false;
   const status = (getRecordCol(r, "Status") ?? getRecordStatus(r)).toLowerCase().trim();
   return status.includes("waiting on customer");
 }
 
 /**
  * V-MODA Filter 2: Waiting on Logo
- * Criteria: Status column contains "Waiting on Logo"
+ * Criteria: In V-MODA Sheet "Status" column has value set to "Waiting on Logo"
  */
 export function isWaitingOnLogo(r: OpsRecord): boolean {
+  if (!isVModaRecord(r)) return false;
   const status = (getRecordCol(r, "Status") ?? getRecordStatus(r)).toLowerCase().trim();
   return status.includes("waiting on logo");
 }
 
 /**
  * V-MODA Filter 3: Waiting on Engraving
- * Criteria: Status column contains "Waiting on Engraving"
+ * Criteria: In V-MODA Sheet "Status" column has value set to "Waiting on Engraving"
  */
 export function isWaitingOnEngraving(r: OpsRecord): boolean {
+  if (!isVModaRecord(r)) return false;
   const status = (getRecordCol(r, "Status") ?? getRecordStatus(r)).toLowerCase().trim();
   return status.includes("waiting on engraving");
 }
 
+/**
+ * V-MODA Filter 4: Pending on Dispatch
+ * Criteria: In V-MODA Sheet "Status" column has value set to "Pending on Dispatch"
+ */
+export function isPendingOnDispatch(r: OpsRecord): boolean {
+  if (!isVModaRecord(r)) return false;
+  const status = (getRecordCol(r, "Status") ?? getRecordStatus(r)).toLowerCase().trim();
+  return status.includes("pending on dispatch");
+}
+
+/**
+ * Demo Filter 1: Order Received but not processed
+ * Criteria: "Inspection & Check Status" is Blank AND "Generate AWB?" is Blank AND "delivery status" is Blank (not set to cancelled)
+ */
+export function isDemoOrderReceivedNotProcessed(r: OpsRecord): boolean {
+  const insp = (getRecordCol(r, "Inspection & Check Status") ?? "").trim().toLowerCase();
+  const isInspBlank = !insp || insp === "false";
+  const genAwb = (getRecordCol(r, "Generate AWB?") ?? "").trim().toLowerCase();
+  const isGenAwbBlank = !genAwb || genAwb === "false";
+  const deliv = (getRecordCol(r, "delivery status") ?? "").trim().toLowerCase();
+  const isDelivBlank = !deliv || deliv === "false" || deliv === "(blank)";
+  const disp = (getRecordCol(r, "Dispatch status") ?? "").trim().toLowerCase();
+  const notCancelledOrDispatched = !/cancel|dispatched|delivered|rto|return/i.test(`${disp} ${deliv}`);
+  return isInspBlank && isGenAwbBlank && isDelivBlank && notCancelledOrDispatched;
+}
+
+/**
+ * Demo Filter 2: Processed but not Dispatched
+ * Criteria: "Generate AWB?" is filled with value "Yes" AND "AWB " column is filled AND "Dispatch status" does not contain "Dispatched", "Delivered", "Cancelled", "RTO", or "Return"
+ */
+export function isDemoProcessedNotDispatched(r: OpsRecord): boolean {
+  const genAwb = (getRecordCol(r, "Generate AWB?") ?? "").trim().toLowerCase();
+  const isGenAwbYes = genAwb === "yes";
+  const awb = (getRecordCol(r, "AWB ") ?? getRecordCol(r, "AWB") ?? "").trim();
+  const isAwbFilled = awb !== "" && !/cancel/i.test(awb);
+  const disp = (getRecordCol(r, "Dispatch status") ?? "").trim().toLowerCase();
+  const deliv = (getRecordCol(r, "delivery status") ?? "").trim().toLowerCase();
+  const combined = `${disp} ${deliv}`;
+  const isBlocked = /dispatched|delivered|cancel|rto|return/i.test(combined);
+  return isGenAwbYes && isAwbFilled && !isBlocked;
+}
+
 /** Extracts and normalizes the order date from record createdAt or raw columns. */
 export function getRecordOrderDate(r: OpsRecord): Date | null {
+  // If record belongs to Above 50k Orders, strictly apply date filter on "Order Date" column:
+  if (isAbove50kRecord(r)) {
+    const rawDate = getRecordCol(r, "Order Date");
+    if (!rawDate || rawDate.trim() === "" || rawDate.trim() === "(blank)") return null;
+    const trimmed = rawDate.trim();
+    if (/^\d{4,6}(\.\d+)?$/.test(trimmed)) {
+      const iso = serialToIso(Number(trimmed));
+      if (iso) {
+        const d = new Date(iso);
+        if (!Number.isNaN(d.getTime())) return d;
+      }
+    }
+    const iso =
+      parseSheetDate(trimmed, "ISO") ??
+      parseSheetDate(trimmed, "DMY") ??
+      parseSheetDate(trimmed, "MDY");
+    if (iso) {
+      const d = new Date(iso);
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+    const direct = new Date(trimmed);
+    return Number.isNaN(direct.getTime()) ? null : direct;
+  }
+
   if (r.createdAt) {
     const d = new Date(r.createdAt);
     if (!Number.isNaN(d.getTime())) return d;
   }
   const rawDate =
+    getRecordCol(r, " Order Timestamp") ??
+    getRecordCol(r, "Order Timestamp") ??
     getRecordCol(r, "Date and time stamp") ??
     getRecordCol(r, "Date and timestamp") ??
     getRecordCol(r, "Order Date") ??
     getRecordCol(r, "Date") ??
     getRecordCol(r, "created");
-  if (!rawDate) return null;
+  if (!rawDate || rawDate.trim() === "" || rawDate.trim() === "(blank)") return null;
+  const trimmed = rawDate.trim();
+  if (/^\d{4,6}(\.\d+)?$/.test(trimmed)) {
+    const iso = serialToIso(Number(trimmed));
+    if (iso) {
+      const d = new Date(iso);
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+  }
   const iso =
-    parseSheetDate(rawDate, "ISO") ??
-    parseSheetDate(rawDate, "DMY") ??
-    parseSheetDate(rawDate, "MDY");
+    parseSheetDate(trimmed, "ISO") ??
+    parseSheetDate(trimmed, "DMY") ??
+    parseSheetDate(trimmed, "MDY");
   if (iso) {
     const d = new Date(iso);
     if (!Number.isNaN(d.getTime())) return d;
   }
-  const direct = new Date(rawDate);
+  const direct = new Date(trimmed);
   if (!Number.isNaN(direct.getTime())) return direct;
   return null;
 }
 
 /** Extracts the numeric order amount (e.g. from Amt or Amount). */
 export function getRecordAmount(r: OpsRecord): number | null {
-  const rawAmt = getRecordCol(r, "Amt") ?? getRecordCol(r, "Amount") ?? getRecordCol(r, "Total");
+  const rawAmt =
+    getRecordCol(r, "Amt") ??
+    getRecordCol(r, "Amount") ??
+    getRecordCol(r, "Order Amount") ??
+    getRecordCol(r, "Total");
   if (rawAmt === null || rawAmt === undefined) return null;
   const cleaned = String(rawAmt).replace(/[^0-9.-]+/g, "");
   const num = parseFloat(cleaned);
@@ -162,7 +271,7 @@ export function getRecordAmount(r: OpsRecord): number | null {
  */
 export function isMonthlyReceived(r: OpsRecord, range?: DateRange, now: Date = new Date()): boolean {
   const d = getRecordOrderDate(r);
-  if (!d) return true; // Include if date unmapped or row is in Above 50k tab
+  if (!d) return false;
   if (range) {
     const t = d.getTime();
     return t >= range.from.getTime() && t < range.to.getTime();
@@ -196,6 +305,9 @@ export type KpiKey =
   | "vmoda_waiting_customer"
   | "vmoda_waiting_logo"
   | "vmoda_waiting_engraving"
+  | "vmoda_pending_dispatch"
+  | "demo_received_not_processed"
+  | "demo_processed_not_dispatched"
   | "open"
   | "created"
   | "resolved"
@@ -252,7 +364,7 @@ export function computeKpis(records: OpsRecord[], range: DateRange, cfg: Metrics
     {
       key: "monthly_received",
       label: "Monthly Orders Received",
-      definition: "Total high-value orders (Above ₹50,000) received in the active monthly cycle.",
+      definition: 'Orders in Above 50k Orders sheet where "Order Date" falls in active monthly period / selected range.',
       requires: [],
       unit: "count",
       good: "up",
@@ -271,20 +383,19 @@ export function computeKpis(records: OpsRecord[], range: DateRange, cfg: Metrics
     const hi = Math.min(s.getTime() + step, range.to.getTime());
     return records.filter((r) => {
       const d = getRecordOrderDate(r);
-      const t = d ? d.getTime() : ms(r.createdAt);
-      return !Number.isNaN(t) && t >= lo && t < hi;
+      return Boolean(d && d.getTime() >= lo && d.getTime() < hi);
     }).length;
   });
 
   // 2. Pending Processing (Requested KPI: Not Yet Processed - renamed professionally)
-  const pendingProcessingOrders = records.filter(isNotYetProcessed);
+  const pendingProcessingOrders = records.filter((r) => isNotYetProcessed(r, range, cfg.now));
   const pendingProcessingTotalAmt = pendingProcessingOrders.reduce((sum, r) => sum + (getRecordAmount(r) ?? 0), 0);
 
   const notYetProcessed = mk(
     {
       key: "not_yet_processed",
       label: "Pending Processing",
-      definition: 'Orders where "Action taken" is blank and status does not contain "cancelled".',
+      definition: 'Orders in range where "Action taken" is blank and status does not contain "cancelled" or "SKU not mapped".',
       requires: [],
       unit: "count",
       good: "down",
@@ -295,29 +406,27 @@ export function computeKpis(records: OpsRecord[], range: DateRange, cfg: Metrics
   notYetProcessed.value = pendingProcessingOrders.length;
   notYetProcessed.totalAmount = pendingProcessingTotalAmt;
 
-  const curProcInRange = records.filter((r) => isMonthlyReceived(r, range, cfg.now) && isNotYetProcessed(r)).length;
-  const prevProcInRange = records.filter((r) => isMonthlyReceived(r, prev, cfg.now) && isNotYetProcessed(r)).length;
+  const prevProcInRange = records.filter((r) => isNotYetProcessed(r, prev, cfg.now)).length;
   notYetProcessed.previous = prevProcInRange;
-  notYetProcessed.deltaPct = pctDelta(curProcInRange, prevProcInRange);
+  notYetProcessed.deltaPct = pctDelta(notYetProcessed.value, prevProcInRange);
   notYetProcessed.sparkline = starts.map((s) => {
     const lo = Math.max(s.getTime(), range.from.getTime());
     const hi = Math.min(s.getTime() + step, range.to.getTime());
     return records.filter((r) => {
       const d = getRecordOrderDate(r);
-      const t = d ? d.getTime() : ms(r.createdAt);
-      return !Number.isNaN(t) && t >= lo && t < hi && isNotYetProcessed(r);
+      return Boolean(d && d.getTime() >= lo && d.getTime() < hi && isNotYetProcessed(r));
     }).length;
   });
 
   // 3. Pending Delivery (Requested KPI: Not Yet Delivered - renamed professionally)
-  const pendingDeliveryOrders = records.filter(isNotYetDelivered);
+  const pendingDeliveryOrders = records.filter((r) => isNotYetDelivered(r, range, cfg.now));
   const pendingDeliveryTotalAmt = pendingDeliveryOrders.reduce((sum, r) => sum + (getRecordAmount(r) ?? 0), 0);
 
   const notYetDelivered = mk(
     {
       key: "not_yet_delivered",
       label: "Pending Delivery",
-      definition: 'Orders where "Delivered yes/no)" is not "Yes" and status does not contain "Delivered", "RTO", or "Returns".',
+      definition: 'Orders in range where "Delivered yes/no)" is not "Yes" and status does not contain "RTO" or "Return".',
       requires: [],
       unit: "count",
       good: "down",
@@ -328,17 +437,15 @@ export function computeKpis(records: OpsRecord[], range: DateRange, cfg: Metrics
   notYetDelivered.value = pendingDeliveryOrders.length;
   notYetDelivered.totalAmount = pendingDeliveryTotalAmt;
 
-  const curDelivInRange = records.filter((r) => isMonthlyReceived(r, range, cfg.now) && isNotYetDelivered(r)).length;
-  const prevDelivInRange = records.filter((r) => isMonthlyReceived(r, prev, cfg.now) && isNotYetDelivered(r)).length;
+  const prevDelivInRange = records.filter((r) => isNotYetDelivered(r, prev, cfg.now)).length;
   notYetDelivered.previous = prevDelivInRange;
-  notYetDelivered.deltaPct = pctDelta(curDelivInRange, prevDelivInRange);
+  notYetDelivered.deltaPct = pctDelta(notYetDelivered.value, prevDelivInRange);
   notYetDelivered.sparkline = starts.map((s) => {
     const lo = Math.max(s.getTime(), range.from.getTime());
     const hi = Math.min(s.getTime() + step, range.to.getTime());
     return records.filter((r) => {
       const d = getRecordOrderDate(r);
-      const t = d ? d.getTime() : ms(r.createdAt);
-      return !Number.isNaN(t) && t >= lo && t < hi && isNotYetDelivered(r);
+      return Boolean(d && d.getTime() >= lo && d.getTime() < hi && isNotYetDelivered(r));
     }).length;
   });
 
@@ -365,7 +472,7 @@ export function computeVModaKpis(
     {
       key: "vmoda_waiting_customer",
       label: "Waiting on Customer",
-      definition: 'V-MODA custom engraving orders where status is "Waiting on Customer".',
+      definition: 'In V-MODA Sheet, "Status" column has value set to "Waiting on Customer".',
       requires: [],
       unit: "count",
       good: "down",
@@ -403,7 +510,7 @@ export function computeVModaKpis(
     {
       key: "vmoda_waiting_logo",
       label: "Waiting on Logo",
-      definition: 'V-MODA custom engraving orders where status is "Waiting on Logo".',
+      definition: 'In V-MODA Sheet, "Status" column has value set to "Waiting on Logo".',
       requires: [],
       unit: "count",
       good: "down",
@@ -441,7 +548,7 @@ export function computeVModaKpis(
     {
       key: "vmoda_waiting_engraving",
       label: "Waiting on Engraving",
-      definition: 'V-MODA custom engraving orders where status is "Waiting on Engraving".',
+      definition: 'In V-MODA Sheet, "Status" column has value set to "Waiting on Engraving".',
       requires: [],
       unit: "count",
       good: "down",
@@ -469,7 +576,136 @@ export function computeVModaKpis(
     }).length;
   });
 
-  return [waitingCustomer, waitingLogo, waitingEngraving];
+  // 4. Pending on Dispatch
+  const pendingDispatchOrders = vmodaRecords.filter(isPendingOnDispatch);
+  const pendingDispatchTotalAmt = pendingDispatchOrders.reduce(
+    (sum, r) => sum + (getRecordAmount(r) ?? 0),
+    0
+  );
+  const pendingDispatch = mk(
+    {
+      key: "vmoda_pending_dispatch",
+      label: "Pending on Dispatch",
+      definition: 'In V-MODA Sheet, "Status" column has value set to "Pending on Dispatch".',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg
+  );
+  pendingDispatch.available = true;
+  pendingDispatch.value = pendingDispatchOrders.length;
+  pendingDispatch.totalAmount = pendingDispatchTotalAmt;
+  const curDispInRange = vmodaRecords.filter(
+    (r) => isMonthlyReceived(r, range, cfg.now) && isPendingOnDispatch(r)
+  ).length;
+  const prevDispInRange = vmodaRecords.filter(
+    (r) => isMonthlyReceived(r, prev, cfg.now) && isPendingOnDispatch(r)
+  ).length;
+  pendingDispatch.previous = prevDispInRange;
+  pendingDispatch.deltaPct = pctDelta(curDispInRange, prevDispInRange);
+  pendingDispatch.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return vmodaRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi && isPendingOnDispatch(r);
+    }).length;
+  });
+
+  return [waitingCustomer, waitingLogo, waitingEngraving, pendingDispatch];
+}
+
+export function computeDemoKpis(
+  records: OpsRecord[],
+  range: DateRange,
+  cfg: MetricsConfig,
+): Kpi[] {
+  const demoRecords = records.filter(isDemoRecord);
+  const prev = previousRange(range);
+  const starts = bucketStarts(range);
+  const step = granularityFor(range) === "day" ? DAY : 7 * DAY;
+
+  // 1. Order Received but not processed
+  const receivedNotProcOrders = demoRecords.filter(isDemoOrderReceivedNotProcessed);
+  const receivedNotProcTotalAmt = receivedNotProcOrders.reduce(
+    (sum, r) => sum + (getRecordAmount(r) ?? 0),
+    0
+  );
+  const receivedNotProc = mk(
+    {
+      key: "demo_received_not_processed",
+      label: "Order Received but not processed",
+      definition:
+        'Demo units where "Inspection & Check Status" is blank, "Generate AWB?" is blank, and "delivery status" is blank.',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg
+  );
+  receivedNotProc.available = true;
+  receivedNotProc.value = receivedNotProcOrders.length;
+  receivedNotProc.totalAmount = receivedNotProcTotalAmt;
+  const curRecInRange = demoRecords.filter(
+    (r) => isMonthlyReceived(r, range, cfg.now) && isDemoOrderReceivedNotProcessed(r)
+  ).length;
+  const prevRecInRange = demoRecords.filter(
+    (r) => isMonthlyReceived(r, prev, cfg.now) && isDemoOrderReceivedNotProcessed(r)
+  ).length;
+  receivedNotProc.previous = prevRecInRange;
+  receivedNotProc.deltaPct = pctDelta(curRecInRange, prevRecInRange);
+  receivedNotProc.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return demoRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi && isDemoOrderReceivedNotProcessed(r);
+    }).length;
+  });
+
+  // 2. Processed but not Dispatched
+  const procNotDispOrders = demoRecords.filter(isDemoProcessedNotDispatched);
+  const procNotDispTotalAmt = procNotDispOrders.reduce(
+    (sum, r) => sum + (getRecordAmount(r) ?? 0),
+    0
+  );
+  const procNotDisp = mk(
+    {
+      key: "demo_processed_not_dispatched",
+      label: "Processed but not Dispatched",
+      definition:
+        'Demo units where "Generate AWB?" is "Yes", "AWB" is filled, and "Dispatch status" does not contain "Dispatched", "Delivered", "Cancelled", "RTO", or "Return".',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg
+  );
+  procNotDisp.available = true;
+  procNotDisp.value = procNotDispOrders.length;
+  procNotDisp.totalAmount = procNotDispTotalAmt;
+  const curProcInRange = demoRecords.filter(
+    (r) => isMonthlyReceived(r, range, cfg.now) && isDemoProcessedNotDispatched(r)
+  ).length;
+  const prevProcInRange = demoRecords.filter(
+    (r) => isMonthlyReceived(r, prev, cfg.now) && isDemoProcessedNotDispatched(r)
+  ).length;
+  procNotDisp.previous = prevProcInRange;
+  procNotDisp.deltaPct = pctDelta(curProcInRange, prevProcInRange);
+  procNotDisp.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return demoRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi && isDemoProcessedNotDispatched(r);
+    }).length;
+  });
+
+  return [receivedNotProc, procNotDisp];
 }
 
 // ----------------------------------------------------------------------------- trend

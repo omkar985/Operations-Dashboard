@@ -17,6 +17,8 @@ import {
   Users,
   Palette,
   Sparkles,
+  PackageCheck,
+  ClipboardList,
 } from "lucide-react";
 import type { OpsRecord } from "@/types/operations";
 import type { KpiKey, DateRange } from "@/lib/metrics/compute";
@@ -35,6 +37,10 @@ import {
   isWaitingOnCustomer,
   isWaitingOnLogo,
   isWaitingOnEngraving,
+  isPendingOnDispatch,
+  isDemoOrderReceivedNotProcessed,
+  isDemoProcessedNotDispatched,
+  isDemoRecord,
   isVModaRecord,
 } from "@/lib/metrics/compute";
 
@@ -143,10 +149,10 @@ export function KpiRecordsModal({
   const cohortRecords = useMemo(() => {
     if (!kpiKey) return records;
     if (kpiKey === "not_yet_processed") {
-      return records.filter(isNotYetProcessed);
+      return records.filter((r) => isNotYetProcessed(r, range));
     }
     if (kpiKey === "not_yet_delivered") {
-      return records.filter(isNotYetDelivered);
+      return records.filter((r) => isNotYetDelivered(r, range));
     }
     if (kpiKey === "monthly_received") {
       return records.filter((r) => isMonthlyReceived(r, range));
@@ -160,12 +166,26 @@ export function KpiRecordsModal({
     if (kpiKey === "vmoda_waiting_engraving") {
       return records.filter(isWaitingOnEngraving);
     }
+    if (kpiKey === "vmoda_pending_dispatch") {
+      return records.filter(isPendingOnDispatch);
+    }
+    if (kpiKey === "demo_received_not_processed") {
+      return records.filter(isDemoOrderReceivedNotProcessed);
+    }
+    if (kpiKey === "demo_processed_not_dispatched") {
+      return records.filter(isDemoProcessedNotDispatched);
+    }
     return records;
   }, [kpiKey, records, range]);
 
   const isVModaCohort = useMemo(() => {
     if (kpiKey?.startsWith("vmoda_")) return true;
     return cohortRecords.length > 0 && cohortRecords.every(isVModaRecord);
+  }, [kpiKey, cohortRecords]);
+
+  const isDemoCohort = useMemo(() => {
+    if (kpiKey?.startsWith("demo_")) return true;
+    return cohortRecords.length > 0 && cohortRecords.every(isDemoRecord);
   }, [kpiKey, cohortRecords]);
 
   // Search filter & sort
@@ -175,21 +195,33 @@ export function KpiRecordsModal({
       const q = search.toLowerCase().trim();
       result = result.filter((r) => {
         const orderNo = (
+          getRecordCol(r, "Order Number") ??
           getRecordCol(r, "Order no.") ??
           getRecordCol(r, "without #") ??
           getRecordCol(r, "Order No") ??
           r.id ??
           ""
         ).toLowerCase();
-        const sku = (getRecordCol(r, "SKU") ?? "").toLowerCase();
+        const sku = (
+          getRecordCol(r, "Product Name") ??
+          getRecordCol(r, "SKU") ??
+          ""
+        ).toLowerCase();
         const customer = (
+          getRecordCol(r, "Customer Name") ??
           getRecordCol(r, "Email id") ??
           getRecordCol(r, "Name") ??
           r.title ??
           ""
         ).toLowerCase();
-        const status = (getRecordCol(r, "Status") ?? getRecordStatus(r)).toLowerCase();
+        const status = (
+          getRecordCol(r, "Dispatch status") ??
+          getRecordCol(r, "Status") ??
+          getRecordStatus(r)
+        ).toLowerCase();
         const action = (
+          getRecordCol(r, "AWB ") ??
+          getRecordCol(r, "AWB") ??
           getRecordCol(r, "Action taken") ??
           getRecordCol(r, "Remark") ??
           ""
@@ -212,12 +244,14 @@ export function KpiRecordsModal({
       }
       if (sortField === "order") {
         const idA =
+          getRecordCol(a, "Order Number") ??
           getRecordCol(a, "Order no.") ??
           getRecordCol(a, "without #") ??
           getRecordCol(a, "Order No") ??
           a.id ??
           "";
         const idB =
+          getRecordCol(b, "Order Number") ??
           getRecordCol(b, "Order no.") ??
           getRecordCol(b, "without #") ??
           getRecordCol(b, "Order No") ??
@@ -246,6 +280,65 @@ export function KpiRecordsModal({
 
   // Export current table view to CSV
   const handleExportCsv = () => {
+    if (isDemoCohort) {
+      const headers = [
+        "Order Number",
+        "Order Date",
+        "Customer Name",
+        "Amount (INR)",
+        "Product Name",
+        "Inspection Status",
+        "Generate AWB?",
+        "AWB",
+        "Dispatch status",
+        "Shopify Admin URL",
+      ];
+
+      const rows = filteredRecords.map((r) => {
+        const orderNo =
+          getRecordCol(r, "Order Number") ??
+          getRecordCol(r, "Order no.") ??
+          getRecordCol(r, "Order No") ??
+          r.id ??
+          "";
+        const cleanId = orderNo.replace(/^#/, "").trim();
+        const orderDate = formatDateDisplay(getRecordOrderDate(r));
+        const customer = getRecordCol(r, "Customer Name") ?? getRecordCol(r, "Name") ?? "";
+        const amt = getRecordAmount(r) ?? 0;
+        const product = (getRecordCol(r, "Product Name") ?? getRecordCol(r, "SKU") ?? "").trim();
+        const insp = getRecordCol(r, "Inspection & Check Status") ?? "Pending";
+        const genAwb = getRecordCol(r, "Generate AWB?") ?? "";
+        const awb = getRecordCol(r, "AWB ") ?? getRecordCol(r, "AWB") ?? "";
+        const disp = getRecordCol(r, "Dispatch status") ?? "";
+        const shopifyUrl = `https://admin.shopify.com/store/headphonezone/orders?query=${encodeURIComponent(
+          cleanId
+        )}`;
+
+        return [
+          `"${orderNo.replace(/"/g, '""')}"`,
+          `"${orderDate}"`,
+          `"${customer.replace(/"/g, '""')}"`,
+          amt,
+          `"${product.replace(/"/g, '""')}"`,
+          `"${insp.replace(/"/g, '""')}"`,
+          `"${genAwb.replace(/"/g, '""')}"`,
+          `"${awb.replace(/"/g, '""')}"`,
+          `"${disp.replace(/"/g, '""')}"`,
+          `"${shopifyUrl}"`,
+        ].join(",");
+      });
+
+      const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${kpiTitle.toLowerCase().replace(/\s+/g, "-")}-demo-units.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
     if (isVModaCohort) {
       const headers = [
         "Order Number",
@@ -381,15 +474,25 @@ export function KpiRecordsModal({
       ? Palette
       : kpiKey === "vmoda_waiting_engraving"
       ? Sparkles
+      : kpiKey === "vmoda_pending_dispatch"
+      ? PackageCheck
+      : kpiKey === "demo_received_not_processed"
+      ? ClipboardList
+      : kpiKey === "demo_processed_not_dispatched"
+      ? PackageCheck
       : Layers;
 
   const headerTheme =
-    kpiKey === "not_yet_processed" || kpiKey === "vmoda_waiting_engraving"
+    kpiKey === "not_yet_processed" ||
+    kpiKey === "vmoda_waiting_engraving" ||
+    kpiKey === "demo_received_not_processed"
       ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
       : kpiKey === "not_yet_delivered"
       ? "text-indigo-500 bg-indigo-500/10 border-indigo-500/20"
       : kpiKey === "vmoda_waiting_logo"
       ? "text-purple-500 bg-purple-500/10 border-purple-500/20"
+      : kpiKey === "vmoda_pending_dispatch"
+      ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
       : "text-[#0284C7] bg-[#0284C7]/10 border-[#0284C7]/20";
 
   return (
@@ -426,7 +529,12 @@ export function KpiRecordsModal({
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {isVModaCohort ? "V-MODA Engraving Orders" : "Above ₹50,000 High-Value Orders"} &bull; Direct Google Sheet records &bull; Click order # to view in Shopify
+                {isDemoCohort
+                  ? "Demo Units To be Dispatch"
+                  : isVModaCohort
+                  ? "V-MODA Engraving Orders"
+                  : "Above ₹50,000 High-Value Orders"}{" "}
+                &bull; Direct Google Sheet records &bull; Click order # to view in Shopify
               </p>
             </div>
           </div>
@@ -470,7 +578,9 @@ export function KpiRecordsModal({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={
-                isVModaCohort
+                isDemoCohort
+                  ? "Search by order #, product, customer, AWB, status..."
+                  : isVModaCohort
                   ? "Search by order #, SKU, customer email, status, remark..."
                   : "Search by order #, SKU, customer, courier, status..."
               }
@@ -548,6 +658,186 @@ export function KpiRecordsModal({
                 Try refining your search query or switching date range presets.
               </p>
             </div>
+          ) : isDemoCohort ? (
+            /* Demo Units Table */
+            <table className="w-full text-left text-xs border-collapse min-w-[760px]">
+              <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 font-semibold uppercase tracking-wider text-[10.5px]">
+                <tr>
+                  <th className="py-2.5 px-3 sm:px-4">Order Number</th>
+                  <th className="py-2.5 px-3 sm:px-4">Order Date</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-right">Amount</th>
+                  <th className="py-2.5 px-3 sm:px-4">Product Name</th>
+                  <th className="py-2.5 px-3 sm:px-4">Customer</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Inspection</th>
+                  <th className="py-2.5 px-3 sm:px-4">AWB / Tracking</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Dispatch Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                {filteredRecords.map((r, i) => {
+                  const orderNo =
+                    getRecordCol(r, "Order Number") ??
+                    getRecordCol(r, "Order no.") ??
+                    getRecordCol(r, "Order No") ??
+                    r.id ??
+                    `Row ${r.row}`;
+                  const cleanOrderId = orderNo.replace(/^#/, "").trim();
+                  const shopifyUrl = `https://admin.shopify.com/store/headphonezone/orders?query=${encodeURIComponent(
+                    cleanOrderId
+                  )}`;
+
+                  const orderDate = formatDateDisplay(getRecordOrderDate(r));
+                  const amt = getRecordAmount(r);
+                  const product = (
+                    getRecordCol(r, "Product Name") ??
+                    getRecordCol(r, "SKU") ??
+                    "—"
+                  ).trim();
+                  const productLink = getRecordCol(r, "Product page link");
+                  const customer =
+                    getRecordCol(r, "Customer Name") ?? getRecordCol(r, "Name") ?? "—";
+                  const inspRaw = (
+                    getRecordCol(r, "Inspection & Check Status") ?? ""
+                  ).toLowerCase();
+                  const isInspected = inspRaw === "true";
+                  const awb = (getRecordCol(r, "AWB ") ?? getRecordCol(r, "AWB") ?? "").trim();
+                  const disp =
+                    getRecordCol(r, "Dispatch status") ??
+                    getRecordCol(r, "Status") ??
+                    getRecordStatus(r) ??
+                    "Pending";
+
+                  // Status badge styling
+                  let statusBadgeClass =
+                    "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+                  const lowerDisp = disp.toLowerCase();
+                  if (lowerDisp.includes("dispatched") || lowerDisp.includes("picked up")) {
+                    statusBadgeClass =
+                      "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40";
+                  } else if (lowerDisp.includes("cancel")) {
+                    statusBadgeClass =
+                      "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/40";
+                  } else if (lowerDisp.includes("rto")) {
+                    statusBadgeClass =
+                      "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/40";
+                  }
+
+                  return (
+                    <tr
+                      key={r.id || `row-${r.row}-${i}`}
+                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                    >
+                      {/* 1. Order Number (Clickable to Shopify) */}
+                      <td className="py-2.5 px-3 sm:px-4 font-mono font-medium whitespace-nowrap">
+                        <a
+                          href={shopifyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[#0284C7] dark:text-[#38BDF8] hover:underline font-semibold"
+                          title="Open Order in Shopify Admin"
+                        >
+                          <span>{orderNo.startsWith("#") ? orderNo : `#${orderNo}`}</span>
+                          <ExternalLink className="w-3 h-3 opacity-70" />
+                        </a>
+                      </td>
+
+                      {/* 2. Order Date */}
+                      <td className="py-2.5 px-3 sm:px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {orderDate}
+                      </td>
+
+                      {/* 3. Amount */}
+                      <td className="py-2.5 px-3 sm:px-4 text-right font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                        {amt !== null ? `₹${amt.toLocaleString("en-IN")}` : "—"}
+                      </td>
+
+                      {/* 4. Product Name */}
+                      <td className="py-2.5 px-3 sm:px-4 max-w-[240px]">
+                        {productLink ? (
+                          <a
+                            href={productLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-slate-700 dark:text-slate-200 hover:text-[#0284C7] dark:hover:text-[#38BDF8] line-clamp-2 transition-colors font-medium inline-flex items-center gap-1"
+                            title={product}
+                          >
+                            <span>{product}</span>
+                            <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                          </a>
+                        ) : (
+                          <span
+                            className="line-clamp-2 text-slate-700 dark:text-slate-300 font-sans"
+                            title={product}
+                          >
+                            {product}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 5. Customer Name */}
+                      <td className="py-2.5 px-3 sm:px-4 max-w-[180px]">
+                        <span
+                          className="truncate text-slate-700 dark:text-slate-300 block font-medium"
+                          title={customer}
+                        >
+                          {customer}
+                        </span>
+                      </td>
+
+                      {/* 6. Inspection Status */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        {isInspected ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                            Checked
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
+                            Pending
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 7. AWB / Tracking */}
+                      <td className="py-2.5 px-3 sm:px-4 whitespace-nowrap">
+                        {awb ? (
+                          <div className="inline-flex items-center gap-1.5">
+                            <span className="font-mono text-slate-800 dark:text-slate-200 text-[11px]">
+                              {awb}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(awb)}
+                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                              title="Copy AWB Number"
+                            >
+                              {copiedId === awb ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-500 italic text-[11px]">
+                            Unassigned
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 8. Dispatch Status */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusBadgeClass} whitespace-nowrap`}
+                          title={disp}
+                        >
+                          {disp}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           ) : isVModaCohort ? (
             /* V-MODA Engraving Table */
             <table className="w-full text-left text-xs border-collapse min-w-[760px]">
@@ -603,6 +893,9 @@ export function KpiRecordsModal({
                   } else if (lowerStatus.includes("engraving")) {
                     statusBadgeClass =
                       "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40";
+                  } else if (lowerStatus.includes("pending on dispatch")) {
+                    statusBadgeClass =
+                      "bg-teal-50 dark:bg-teal-950/50 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800/40";
                   } else if (lowerStatus.includes("deliver")) {
                     statusBadgeClass =
                       "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40";

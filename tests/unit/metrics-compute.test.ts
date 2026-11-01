@@ -8,12 +8,18 @@ import {
   needsAttention,
   isNotYetProcessed,
   isNotYetDelivered,
+  isMonthlyReceived,
   isVModaRecord,
   isAbove50kRecord,
   isWaitingOnCustomer,
   isWaitingOnLogo,
   isWaitingOnEngraving,
+  isPendingOnDispatch,
   computeVModaKpis,
+  isDemoRecord,
+  isDemoOrderReceivedNotProcessed,
+  isDemoProcessedNotDispatched,
+  computeDemoKpis,
   type MetricsConfig,
   type DateRange,
 } from "@/lib/metrics/compute";
@@ -172,10 +178,26 @@ describe("Metrics Pure Function Calculations", () => {
       raw: { "Action taken": "Called customer to confirm", status: "Processing" },
     };
 
+    const skuUnmapped: OpsRecord = {
+      row: 6,
+      id: "ORD-5",
+      title: "Order 5",
+      status: "SKU not mapped",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: { "Action taken": "", status: "SKU not mapped" },
+    };
+
     expect(isNotYetProcessed(unproc1)).toBe(true);
     expect(isNotYetProcessed(unproc2)).toBe(true);
     expect(isNotYetProcessed(cancelled)).toBe(false);
     expect(isNotYetProcessed(processed)).toBe(false);
+    expect(isNotYetProcessed(skuUnmapped)).toBe(false);
   });
 
   it("filters Not Yet Delivered accurately based on Delivered yes/no not yes and status not Delivered/RTO/Returns", () => {
@@ -270,6 +292,95 @@ describe("Metrics Pure Function Calculations", () => {
     expect(isNotYetDelivered(alreadyDelivered2)).toBe(false);
     expect(isNotYetDelivered(rto)).toBe(false);
     expect(isNotYetDelivered(returns)).toBe(false);
+  });
+
+  it("filters Above 50k records strictly by Order Date and updates counts on month change", () => {
+    const octRange: DateRange = {
+      from: new Date("2026-10-01T00:00:00.000Z"),
+      to: new Date("2026-11-01T00:00:00.000Z"),
+    };
+    const novRange: DateRange = {
+      from: new Date("2026-11-01T00:00:00.000Z"),
+      to: new Date("2026-12-01T00:00:00.000Z"),
+    };
+
+    const octRecord: OpsRecord = {
+      row: 10,
+      id: "ORD-OCT",
+      title: "Oct Order",
+      status: "New",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: {
+        "Order Date": "46312", // 2026-10-17
+        "Action taken": "",
+        status: "",
+        "Delivered yes/no)": "No",
+      },
+    };
+
+    const novRecord: OpsRecord = {
+      row: 11,
+      id: "ORD-NOV",
+      title: "Nov Order",
+      status: "New",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: {
+        "Order Date": "46327", // 2026-11-01
+        "Action taken": "",
+        status: "",
+        "Delivered yes/no)": "No",
+      },
+    };
+
+    const unDatedRecord: OpsRecord = {
+      row: 12,
+      id: "ORD-UNDATED",
+      title: "No Date Order",
+      status: "New",
+      priority: null,
+      category: null,
+      team: null,
+      assignee: null,
+      createdAt: null,
+      dueAt: null,
+      resolvedAt: null,
+      raw: {
+        "Order Date": null,
+        "Action taken": "",
+        status: "",
+        "Delivered yes/no)": "No",
+      },
+    };
+
+    // Monthly Received
+    expect(isMonthlyReceived(octRecord, octRange)).toBe(true);
+    expect(isMonthlyReceived(octRecord, novRange)).toBe(false);
+    expect(isMonthlyReceived(novRecord, novRange)).toBe(true);
+    expect(isMonthlyReceived(novRecord, octRange)).toBe(false);
+    expect(isMonthlyReceived(unDatedRecord, octRange)).toBe(false);
+    expect(isMonthlyReceived(unDatedRecord, novRange)).toBe(false);
+
+    // Pending Processing with range
+    expect(isNotYetProcessed(octRecord, octRange)).toBe(true);
+    expect(isNotYetProcessed(octRecord, novRange)).toBe(false);
+    expect(isNotYetProcessed(novRecord, novRange)).toBe(true);
+
+    // Pending Delivery with range
+    expect(isNotYetDelivered(octRecord, octRange)).toBe(true);
+    expect(isNotYetDelivered(octRecord, novRange)).toBe(false);
+    expect(isNotYetDelivered(novRecord, novRange)).toBe(true);
   });
 
   it("builds daily/weekly trend series without synthetic numbers", () => {
@@ -398,6 +509,30 @@ describe("Metrics Pure Function Calculations", () => {
       },
       {
         row: 5,
+        subsheet: "V-MODA",
+        id: "932105",
+        title: "Order 932105",
+        status: "Pending on Dispatch",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order no.": "#932105",
+          "Email id": "cust4@example.com",
+          "Amount": "28999",
+          "SKU": "V-MODA - Hex Headphone",
+          "Wants it Engraved?": "Yes",
+          "Status": "Pending on Dispatch",
+          "Remark": "Engraving finished, packed",
+          "Dispatched or Not ": "",
+        },
+      },
+      {
+        row: 6,
         subsheet: "Above 50k Orders",
         id: "932104",
         title: "Order 932104",
@@ -422,9 +557,10 @@ describe("Metrics Pure Function Calculations", () => {
       expect(isVModaRecord(vmodaRecords[0])).toBe(true);
       expect(isVModaRecord(vmodaRecords[1])).toBe(true);
       expect(isVModaRecord(vmodaRecords[2])).toBe(true);
-      expect(isVModaRecord(vmodaRecords[3])).toBe(false);
+      expect(isVModaRecord(vmodaRecords[3])).toBe(true);
+      expect(isVModaRecord(vmodaRecords[4])).toBe(false);
 
-      expect(isAbove50kRecord(vmodaRecords[3])).toBe(true);
+      expect(isAbove50kRecord(vmodaRecords[4])).toBe(true);
       expect(isAbove50kRecord(vmodaRecords[0])).toBe(false);
     });
 
@@ -437,11 +573,57 @@ describe("Metrics Pure Function Calculations", () => {
 
       expect(isWaitingOnEngraving(vmodaRecords[2])).toBe(true);
       expect(isWaitingOnEngraving(vmodaRecords[0])).toBe(false);
+
+      expect(isPendingOnDispatch(vmodaRecords[3])).toBe(true);
+      expect(isPendingOnDispatch(vmodaRecords[0])).toBe(false);
+
+      // Verify sheet isolation: non-V-MODA record with matching status must return false
+      const nonVModaWithCustStatus: OpsRecord = {
+        row: 99,
+        subsheet: "Above 50k Orders",
+        id: "NON-VMODA",
+        title: "Test",
+        status: "Waiting on Customer",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "status": "Waiting on Customer",
+        },
+      };
+      expect(isWaitingOnCustomer(nonVModaWithCustStatus)).toBe(false);
+      expect(isWaitingOnLogo(nonVModaWithCustStatus)).toBe(false);
+      expect(isWaitingOnEngraving(nonVModaWithCustStatus)).toBe(false);
+      expect(isPendingOnDispatch(nonVModaWithCustStatus)).toBe(false);
+
+      // Verify case-insensitivity & whitespace trimming
+      const vmodaCaseInsensitive: OpsRecord = {
+        row: 100,
+        subsheet: "V-MODA",
+        id: "VMODA-CI",
+        title: "Case Insensitive Test",
+        status: "waiting on customer  ",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Status": "  Waiting On Customer  ",
+        },
+      };
+      expect(isWaitingOnCustomer(vmodaCaseInsensitive)).toBe(true);
     });
 
     it("computes accurate V-MODA KPIs with total counts and amounts", () => {
       const kpis = computeVModaKpis(vmodaRecords, range, config);
-      expect(kpis.length).toBe(3);
+      expect(kpis.length).toBe(4);
 
       const custKpi = kpis.find((k) => k.key === "vmoda_waiting_customer");
       expect(custKpi).toBeDefined();
@@ -457,6 +639,147 @@ describe("Metrics Pure Function Calculations", () => {
       expect(engrKpi).toBeDefined();
       expect(engrKpi?.value).toBe(1);
       expect(engrKpi?.totalAmount).toBe(21999);
+
+      const dispKpi = kpis.find((k) => k.key === "vmoda_pending_dispatch");
+      expect(dispKpi).toBeDefined();
+      expect(dispKpi?.value).toBe(1);
+      expect(dispKpi?.totalAmount).toBe(28999);
+    });
+  });
+
+  describe("Demo Units To be Dispatch Metrics", () => {
+    const demoRecords: OpsRecord[] = [
+      {
+        row: 10,
+        id: "DEMO-1",
+        title: "Demo 1",
+        status: "",
+        subsheet: "Demo ",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "#1121446",
+          "Order Amount": "15,000",
+          "Product Name": "Custom - Junior (Ex-Demo Unit)",
+          "Inspection & Check Status": "",
+          "Generate AWB?": "",
+          "AWB ": "",
+          "Dispatch status": "",
+          "delivery status": "",
+        },
+      },
+      {
+        row: 11,
+        id: "DEMO-2",
+        title: "Demo 2",
+        status: "",
+        subsheet: "Demo ",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "#1139552",
+          "Order Amount": "22,500",
+          "Product Name": "Custom - Senior (Ex-Demo Unit)",
+          "Inspection & Check Status": "Checked",
+          "Generate AWB?": "Yes",
+          "AWB ": "123456789",
+          "Dispatch status": "",
+        },
+      },
+      {
+        row: 12,
+        id: "DEMO-3",
+        title: "Demo 3",
+        status: "Cancelled",
+        subsheet: "Demo ",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "#1140000",
+          "Order Amount": "10,000",
+          "Product Name": "Custom Unit",
+          "Inspection & Check Status": "",
+          "Generate AWB?": "",
+          "AWB ": "",
+          "Dispatch status": "disp cancelled",
+          "delivery status": "Cancelled",
+        },
+      },
+      {
+        row: 13,
+        id: "DEMO-4",
+        title: "Demo 4",
+        status: "Dispatched",
+        subsheet: "Demo ",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: null,
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "#1140001",
+          "Order Amount": "30,000",
+          "Product Name": "Custom Unit 2",
+          "Inspection & Check Status": "TRUE",
+          "Generate AWB?": "Yes",
+          "AWB ": "987654321",
+          "Dispatch status": "Dispatched",
+        },
+      },
+    ];
+
+    it("correctly identifies Demo records", () => {
+      expect(isDemoRecord(demoRecords[0])).toBe(true);
+      expect(isDemoRecord(demoRecords[1])).toBe(true);
+      expect(isDemoRecord(demoRecords[2])).toBe(true);
+      expect(isAbove50kRecord(demoRecords[0])).toBe(false);
+      expect(isVModaRecord(demoRecords[0])).toBe(false);
+    });
+
+    it("identifies Order Received but not processed", () => {
+      expect(isDemoOrderReceivedNotProcessed(demoRecords[0])).toBe(true);
+      expect(isDemoOrderReceivedNotProcessed(demoRecords[1])).toBe(false);
+      // Cancelled order should be excluded
+      expect(isDemoOrderReceivedNotProcessed(demoRecords[2])).toBe(false);
+    });
+
+    it("identifies Processed but not Dispatched", () => {
+      expect(isDemoProcessedNotDispatched(demoRecords[0])).toBe(false);
+      expect(isDemoProcessedNotDispatched(demoRecords[1])).toBe(true);
+      expect(isDemoProcessedNotDispatched(demoRecords[2])).toBe(false);
+      expect(isDemoProcessedNotDispatched(demoRecords[3])).toBe(false);
+    });
+
+    it("computes accurate Demo KPIs with total counts and amounts", () => {
+      const kpis = computeDemoKpis(demoRecords, range, config);
+      expect(kpis.length).toBe(2);
+
+      const receivedKpi = kpis.find((k) => k.key === "demo_received_not_processed");
+      expect(receivedKpi).toBeDefined();
+      expect(receivedKpi?.value).toBe(1);
+      expect(receivedKpi?.totalAmount).toBe(15000);
+
+      const processedKpi = kpis.find((k) => k.key === "demo_processed_not_dispatched");
+      expect(processedKpi).toBeDefined();
+      expect(processedKpi?.value).toBe(1);
+      expect(processedKpi?.totalAmount).toBe(22500);
     });
   });
 });

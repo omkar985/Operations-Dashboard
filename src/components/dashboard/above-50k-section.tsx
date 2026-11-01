@@ -27,13 +27,19 @@ export function Above50kSection({ records, kpis, range }: Above50kSectionProps) 
   return (
     <section className="space-y-4">
       {/* Section Header */}
-      <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-          Above ₹50,000 Orders
-        </h2>
-        <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-          Click any card below to view order details and Shopify links
-        </p>
+      <div className="flex items-start gap-3">
+        <span
+          className="w-1.5 self-stretch min-h-[38px] my-0.5 rounded-full bg-gradient-to-b from-[#0284C7] to-cyan-400 shrink-0 shadow-sm"
+          aria-hidden="true"
+        />
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Above ₹50,000 Orders
+          </h2>
+          <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+            Click any card below to view order details and Shopify links
+          </p>
+        </div>
       </div>
 
       {/* Glassmorphic KPI Cards */}

@@ -16,6 +16,8 @@ import {
   Users,
   Palette,
   Sparkles,
+  PackageCheck,
+  ClipboardList,
 } from "lucide-react";
 
 interface KpiLedgerProps {
@@ -48,8 +50,8 @@ const KPI_CONFIG: Record<
     sublabel: "Above ₹50,000 threshold",
     filterTitle: "Monthly Orders Filter",
     filterRules: [
-      { label: "Sheet Tab", value: '"Above 50k orders"' },
-      { label: "Order Date", value: "Within active monthly period" },
+      { label: "Sheet Tab", value: '"Above 50k Orders"' },
+      { label: "Date Column", value: 'Column "Order Date" within current month / selected range' },
       { label: "Order Amount", value: "₹50,000 and above" },
     ],
   },
@@ -63,8 +65,10 @@ const KPI_CONFIG: Record<
     sublabel: "Awaiting courier assignment",
     filterTitle: "Pending Processing Filter",
     filterRules: [
-      { label: "Action taken", value: "Is Blank (no courier/tracking yet)" },
-      { label: "Order Status", value: 'Does not contain "Cancelled"' },
+      { label: "Sheet Tab", value: '"Above 50k Orders"' },
+      { label: "Date Filter", value: "Current month or based on selected filter" },
+      { label: "Action taken", value: "Column is Blank" },
+      { label: "Status Column", value: 'Does not contain "cancelled" or "SKU not mapped"' },
     ],
   },
   not_yet_delivered: {
@@ -77,8 +81,10 @@ const KPI_CONFIG: Record<
     sublabel: "With courier for delivery",
     filterTitle: "Pending Delivery Filter",
     filterRules: [
-      { label: "Delivered (yes/no)", value: 'Is not "Yes"' },
-      { label: "Tracking Status", value: 'Does not contain "Delivered", "RTO", or "Returns"' },
+      { label: "Sheet Tab", value: '"Above 50k Orders"' },
+      { label: "Date Filter", value: "Current month or based on selected filter" },
+      { label: "Delivered Status", value: 'Column "Delivered yes/no)" is not set to "Yes"' },
+      { label: "Status Column", value: 'Does not contain "RTO" or "Return"' },
     ],
   },
   vmoda_waiting_customer: {
@@ -123,6 +129,52 @@ const KPI_CONFIG: Record<
       { label: "Status Column", value: 'Set to "Waiting on Engraving"' },
     ],
   },
+  vmoda_pending_dispatch: {
+    icon: PackageCheck,
+    tag: "Dispatch Ready",
+    tagStyle: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200/80 dark:border-emerald-800/50",
+    iconStyle: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    glowGradient: "from-emerald-500/8 via-emerald-500/3 to-transparent",
+    sparklineColor: "#10B981",
+    sublabel: "Engraved and awaiting dispatch",
+    filterTitle: "Pending on Dispatch Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"V-MODA"' },
+      { label: "Status Column", value: 'Set to "Pending on Dispatch"' },
+    ],
+  },
+  demo_received_not_processed: {
+    icon: ClipboardList,
+    tag: "Awaiting Processing",
+    tagStyle: "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/50",
+    iconStyle: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20",
+    glowGradient: "from-amber-500/8 via-amber-500/3 to-transparent",
+    sparklineColor: "#F59E0B",
+    sublabel: "Pending inspection & AWB generation",
+    filterTitle: "Order Received Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"Demo "' },
+      { label: "Inspection Status", value: "Is Blank / Unchecked" },
+      { label: "Generate AWB?", value: "Is Blank" },
+      { label: "Delivery Status", value: 'Is Blank (not "Cancelled")' },
+    ],
+  },
+  demo_processed_not_dispatched: {
+    icon: PackageCheck,
+    tag: "Pending Dispatch",
+    tagStyle: "bg-sky-50 dark:bg-sky-950/50 text-[#0284C7] dark:text-[#38BDF8] border-sky-200/80 dark:border-sky-800/50",
+    iconStyle: "text-[#0284C7] dark:text-[#38BDF8] bg-[#0284C7]/10 border-[#0284C7]/20",
+    glowGradient: "from-[#0284C7]/8 via-[#0284C7]/3 to-transparent",
+    sparklineColor: "#0284C7",
+    sublabel: "AWB created, awaiting dispatch",
+    filterTitle: "Processed Units Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"Demo "' },
+      { label: "Generate AWB?", value: 'Filled with "Yes"' },
+      { label: "AWB Number", value: "Is Filled" },
+      { label: "Dispatch status", value: 'Excludes "Dispatched", "Delivered", "Cancelled", "RTO", "Return"' },
+    ],
+  },
 };
 
 export function KpiLedger({ kpis, className = "", onCardClick }: KpiLedgerProps) {
@@ -146,8 +198,15 @@ export function KpiLedger({ kpis, className = "", onCardClick }: KpiLedgerProps)
     return kpi.value.toLocaleString();
   };
 
+  const gridCols =
+    kpis.length === 2
+      ? "grid-cols-1 md:grid-cols-2"
+      : kpis.length === 4
+      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+      : "grid-cols-1 md:grid-cols-3";
+
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-3 gap-5 ${className}`}>
+    <div className={`grid ${gridCols} gap-5 ${className}`}>
       {kpis.map((kpi) => {
         const config = KPI_CONFIG[kpi.key] || {
           icon: TrendingUp,
@@ -166,7 +225,7 @@ export function KpiLedger({ kpis, className = "", onCardClick }: KpiLedgerProps)
         const isFlipped = Boolean(flippedKeys[kpi.key]);
 
         return (
-          <div key={kpi.key} className="flip-card-container h-full min-h-[220px]">
+          <div key={kpi.key} className="flip-card-container h-full min-h-[260px] sm:min-h-[270px]">
             <div className={`flip-card-inner ${isFlipped ? "is-flipped" : ""}`}>
               {/* ========================================================
                   FRONT FACE: Metric card with click to open order records
@@ -184,7 +243,7 @@ export function KpiLedger({ kpis, className = "", onCardClick }: KpiLedgerProps)
                   }
                 }}
                 className={`
-                  flip-card-front rounded-2xl p-5 sm:p-6 transition-all duration-300
+                  flip-card-front rounded-2xl p-4 sm:p-5 transition-all duration-300
                   backdrop-blur-xl bg-white/75 dark:bg-slate-900/65
                   border border-white/60 dark:border-white/10
                   shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)]
@@ -309,22 +368,22 @@ export function KpiLedger({ kpis, className = "", onCardClick }: KpiLedgerProps)
                   BACK FACE: Flipped card showing applied filter criteria
                   ======================================================== */}
               <div
-                className="flip-card-back rounded-2xl p-5 sm:p-6 backdrop-blur-2xl bg-slate-900/95 dark:bg-slate-950/95 text-white border border-slate-700/80 dark:border-white/10 shadow-2xl flex flex-col justify-between"
+                className="flip-card-back rounded-2xl p-4 sm:p-5 backdrop-blur-2xl bg-slate-900/95 dark:bg-slate-950/95 text-white border border-slate-700/80 dark:border-white/10 shadow-2xl flex flex-col justify-between overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Back Face Header */}
-                <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between pb-2 border-b border-white/10 shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
                     <div
                       className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 ${config.iconStyle}`}
                     >
                       <Filter className="w-3.5 h-3.5 stroke-[2]" />
                     </div>
-                    <div>
-                      <span className="text-[10.5px] font-bold text-[#38BDF8] uppercase tracking-wider block">
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-bold text-[#38BDF8] uppercase tracking-wider block">
                         Filter Applied
                       </span>
-                      <span className="text-xs font-semibold text-slate-200">
+                      <span className="text-xs font-semibold text-slate-200 truncate block">
                         {config.filterTitle}
                       </span>
                     </div>
@@ -334,7 +393,7 @@ export function KpiLedger({ kpis, className = "", onCardClick }: KpiLedgerProps)
                   <button
                     type="button"
                     onClick={() => toggleFlip(kpi.key)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 transition-all flex items-center gap-1.5 cursor-pointer border border-white/10"
+                    className="px-2 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 transition-all flex items-center gap-1.5 cursor-pointer border border-white/10 shrink-0"
                     title="Flip back to metric"
                   >
                     <RotateCcw className="w-3 h-3" />
@@ -343,12 +402,15 @@ export function KpiLedger({ kpis, className = "", onCardClick }: KpiLedgerProps)
                 </div>
 
                 {/* Back Face Content: Filter Rules */}
-                <div className="my-3 space-y-2.5">
-                  <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                <div
+                  className="my-2.5 flex-1 min-h-0 flex flex-col justify-center space-y-2 overflow-y-auto"
+                  data-lenis-prevent
+                >
+                  <div className="p-2.5 rounded-xl bg-white/[0.05] border border-white/10 space-y-1.5">
                     {config.filterRules.map((rule, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-xs">
+                      <div key={idx} className="flex items-start gap-1.5 text-[11px] sm:text-xs">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#38BDF8] shrink-0 mt-1.5" />
-                        <div className="leading-snug">
+                        <div className="leading-snug min-w-0 break-words">
                           <span className="text-slate-400 font-medium">{rule.label}: </span>
                           <span className="text-slate-100 font-semibold">{rule.value}</span>
                         </div>
@@ -356,18 +418,20 @@ export function KpiLedger({ kpis, className = "", onCardClick }: KpiLedgerProps)
                     ))}
                   </div>
 
-                  <p className="text-[11px] text-slate-400 leading-relaxed px-1">
-                    {kpi.definition}
-                  </p>
+                  {kpi.definition && (
+                    <p className="text-[10.5px] text-slate-400 leading-snug px-1 line-clamp-2">
+                      {kpi.definition}
+                    </p>
+                  )}
                 </div>
 
                 {/* Back Face Footer */}
-                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Click Back to return to metric</span>
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400 shrink-0">
+                  <span className="text-[10.5px] text-slate-400 truncate">Click Back to return to metric</span>
                   <button
                     type="button"
                     onClick={() => toggleFlip(kpi.key)}
-                    className="text-[#38BDF8] hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                    className="text-[#38BDF8] hover:underline flex items-center gap-1 font-semibold cursor-pointer shrink-0 ml-2"
                   >
                     <span>Flip back</span>
                     <span>&larr;</span>

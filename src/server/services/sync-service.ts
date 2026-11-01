@@ -66,7 +66,11 @@ export async function runSync(opts: { trigger: SyncTrigger; actor?: SessionUser 
     const sheetTitles = Array.from(new Set([...mappingSheets, ...envSheets]));
 
     const targetWorksheets = sheetTitles
-      .map((name) => info.worksheets.find((w) => w.title === name) ?? info.worksheets.find((w) => w.title.toLowerCase() === name.toLowerCase()))
+      .map(
+        (name) =>
+          info.worksheets.find((w) => w.title === name) ??
+          info.worksheets.find((w) => w.title.trim().toLowerCase() === name.trim().toLowerCase())
+      )
       .filter((w): w is NonNullable<typeof w> => Boolean(w));
 
     if (targetWorksheets.length === 0) {

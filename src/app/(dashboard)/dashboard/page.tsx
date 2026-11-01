@@ -6,13 +6,16 @@ import { parseRange } from "@/lib/metrics/range";
 import {
   computeKpis,
   computeVModaKpis,
+  computeDemoKpis,
   isAbove50kRecord,
   isVModaRecord,
+  isDemoRecord,
   type MetricsConfig,
 } from "@/lib/metrics/compute";
 import type { FieldKey } from "@/types/operations";
 import { Above50kSection } from "@/components/dashboard/above-50k-section";
 import { VModaSection } from "@/components/dashboard/vmoda-section";
+import { DemoSection } from "@/components/dashboard/demo-section";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LiveRefreshHeader } from "@/components/dashboard/live-refresh-header";
@@ -102,16 +105,18 @@ export default async function DashboardPage(props: DashboardPageProps) {
 
   const above50kRecords = dataset.records.filter(isAbove50kRecord);
   const vmodaRecords = dataset.records.filter(isVModaRecord);
+  const demoRecords = dataset.records.filter(isDemoRecord);
 
   const above50kKpis = computeKpis(above50kRecords, parsedRange, metricsConfig);
   const vmodaKpis = computeVModaKpis(dataset.records, parsedRange, metricsConfig);
+  const demoKpis = computeDemoKpis(dataset.records, parsedRange, metricsConfig);
 
   const exportUrl = `/api/operations/export?range=${encodeURIComponent(
     parsedRange.key
   )}${parsedRange.key === "custom" ? `&from=${parsedRange.fromInput}&to=${parsedRange.toInput}` : ""}`;
 
   return (
-    <div className="page space-y-8">
+    <div className="page space-y-9">
       {/* Top Header Row: Brand Title & Live Telemetry Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -153,6 +158,9 @@ export default async function DashboardPage(props: DashboardPageProps) {
 
       {/* V-MODA Engraving Orders Section with Glassmorphic Cards & Drill-down Modal */}
       <VModaSection records={vmodaRecords} kpis={vmodaKpis} range={parsedRange} />
+
+      {/* Demo Units To be Dispatch Section with Glassmorphic Cards & Drill-down Modal */}
+      <DemoSection records={demoRecords} kpis={demoKpis} range={parsedRange} />
     </div>
   );
 }
