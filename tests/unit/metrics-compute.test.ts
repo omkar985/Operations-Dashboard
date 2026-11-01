@@ -20,6 +20,14 @@ import {
   isDemoOrderReceivedNotProcessed,
   isDemoProcessedNotDispatched,
   computeDemoKpis,
+  isKantoRecord,
+  isKantoWaitingOnAssembly,
+  isKantoWaitingOnProcess,
+  isKantoDispatched,
+  getKantoAssemblingDueDate,
+  isKantoDueDateOverdue,
+  isKantoDueDateWithin,
+  computeKantoKpis,
   type MetricsConfig,
   type DateRange,
 } from "@/lib/metrics/compute";
@@ -780,6 +788,197 @@ describe("Metrics Pure Function Calculations", () => {
       expect(processedKpi).toBeDefined();
       expect(processedKpi?.value).toBe(1);
       expect(processedKpi?.totalAmount).toBe(22500);
+    });
+  });
+
+  describe("Kanto Products Metrics", () => {
+    const kantoRecords: OpsRecord[] = [
+      {
+        row: 148,
+        id: "1206219",
+        title: "Kanto Order 1",
+        status: "Order Received",
+        subsheet: "Kanto",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: "2026-10-30T10:00:00.000Z",
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "1206219",
+          "Order Date": "46326",
+          "SKU": "Kanto - ORA4 - Matte Black",
+          "Order Value ": "33999",
+          "Assembling Due Date": "46328", // 2026-11-02
+          "Assembled? ": "",
+          "Status": "",
+        },
+      },
+      {
+        row: 5,
+        id: "1095682",
+        title: "Kanto Order 2",
+        status: "Order Received",
+        subsheet: "Kanto",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: "2026-07-15T10:00:00.000Z",
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "1095682",
+          "Order Date": "46222",
+          "SKU": "Kanto - ORA - Matte White",
+          "Order Value ": "24999",
+          "Assembling Due Date": "46223", // 2026-07-20
+          "Assembled? ": "No",
+          "Status": "No Stock",
+        },
+      },
+      {
+        row: 6,
+        id: "1095798",
+        title: "Kanto Order 3",
+        status: "Order Received",
+        subsheet: "Kanto",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: "2026-07-16T10:00:00.000Z",
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "1095798",
+          "Order Date": "46222",
+          "SKU": "Kanto - Uki - Sage",
+          "Order Value ": "16999",
+          "Assembling Due Date": "46223",
+          "Assembled? ": "Yes",
+          "Status": "Delivered",
+        },
+      },
+      {
+        row: 14,
+        id: "1099943",
+        title: "Kanto Order 4",
+        status: "Order Received",
+        subsheet: "Kanto",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: "2026-07-18T10:00:00.000Z",
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "1099943",
+          "Order Date": "46224",
+          "SKU": "Kanto - Uki - Pumice",
+          "Order Value ": "16999",
+          "Assembling Due Date": "46225",
+          "Assembled? ": "Yes",
+          "Status": "Dispatched",
+        },
+      },
+      {
+        row: 13,
+        id: "1099481",
+        title: "Kanto Order 5",
+        status: "Order Received",
+        subsheet: "Kanto",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: "2026-07-17T10:00:00.000Z",
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "1099481",
+          "Order Date": "46224",
+          "SKU": "Kanto - Uki - Sage",
+          "Order Value ": "16999",
+          "Assembling Due Date": "46225",
+          "Assembled? ": "Yes",
+          "Status": "Cancelled ",
+        },
+      },
+    ];
+
+    it("correctly identifies Kanto records", () => {
+      expect(isKantoRecord(kantoRecords[0])).toBe(true);
+      expect(isKantoRecord(kantoRecords[1])).toBe(true);
+      expect(isAbove50kRecord(kantoRecords[0])).toBe(false);
+      expect(isVModaRecord(kantoRecords[0])).toBe(false);
+      expect(isDemoRecord(kantoRecords[0])).toBe(false);
+    });
+
+    it("identifies Waiting on Assembly (Assembled? is Blank)", () => {
+      expect(isKantoWaitingOnAssembly(kantoRecords[0])).toBe(true);
+      expect(isKantoWaitingOnAssembly(kantoRecords[1])).toBe(false);
+      expect(isKantoWaitingOnAssembly(kantoRecords[2])).toBe(false);
+    });
+
+    it("identifies Waiting on Process (Status excludes Processed/Fulfilled, Cancelled, Delivered, Dispatched)", () => {
+      expect(isKantoWaitingOnProcess(kantoRecords[0])).toBe(true); // blank status -> waiting on process
+      expect(isKantoWaitingOnProcess(kantoRecords[1])).toBe(true); // No Stock -> waiting on process
+      expect(isKantoWaitingOnProcess(kantoRecords[2])).toBe(false); // Delivered -> excluded
+      expect(isKantoWaitingOnProcess(kantoRecords[3])).toBe(false); // Dispatched -> excluded
+      expect(isKantoWaitingOnProcess(kantoRecords[4])).toBe(false); // Cancelled -> excluded
+    });
+
+    it("accurately evaluates Due Date into Overdue vs Within Due Date", () => {
+      const fixedNow = new Date("2026-11-01T12:00:00.000Z");
+
+      const due1 = getKantoAssemblingDueDate(kantoRecords[0]); // 2026-11-02
+      expect(due1).toBeDefined();
+      expect(isKantoDueDateWithin(due1!, fixedNow)).toBe(true);
+      expect(isKantoDueDateOverdue(due1!, fixedNow)).toBe(false);
+
+      const due2 = getKantoAssemblingDueDate(kantoRecords[1]); // 2026-07-20
+      expect(due2).toBeDefined();
+      expect(isKantoDueDateWithin(due2!, fixedNow)).toBe(false);
+      expect(isKantoDueDateOverdue(due2!, fixedNow)).toBe(true);
+    });
+
+    it("identifies Dispatched (Status is Dispatched or Delivered)", () => {
+      expect(isKantoDispatched(kantoRecords[0])).toBe(false);
+      expect(isKantoDispatched(kantoRecords[1])).toBe(false);
+      expect(isKantoDispatched(kantoRecords[2])).toBe(true); // Delivered
+      expect(isKantoDispatched(kantoRecords[3])).toBe(true); // Dispatched
+      expect(isKantoDispatched(kantoRecords[4])).toBe(false); // Cancelled
+    });
+
+    it("computes accurate Kanto KPIs with Overdue and Within Due Date counts", () => {
+      const fixedConfig: MetricsConfig = {
+        ...config,
+        now: new Date("2026-11-01T12:00:00.000Z"),
+      };
+
+      const kpis = computeKantoKpis(kantoRecords, range, fixedConfig);
+      expect(kpis.length).toBe(3);
+
+      const assemblyKpi = kpis.find((k) => k.key === "kanto_waiting_assembly");
+      expect(assemblyKpi).toBeDefined();
+      expect(assemblyKpi?.value).toBe(1);
+      expect(assemblyKpi?.totalAmount).toBe(33999);
+
+      const processKpi = kpis.find((k) => k.key === "kanto_waiting_process");
+      expect(processKpi).toBeDefined();
+      expect(processKpi?.value).toBe(2);
+      expect(processKpi?.overdueCount).toBe(1);
+      expect(processKpi?.withinDueCount).toBe(1);
+      expect(processKpi?.totalAmount).toBe(33999 + 24999);
+
+      const dispKpi = kpis.find((k) => k.key === "kanto_dispatched");
+      expect(dispKpi).toBeDefined();
+      expect(dispKpi?.value).toBe(2);
+      expect(dispKpi?.totalAmount).toBe(16999 + 16999);
     });
   });
 });

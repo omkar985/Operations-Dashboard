@@ -7,15 +7,18 @@ import {
   computeKpis,
   computeVModaKpis,
   computeDemoKpis,
+  computeKantoKpis,
   isAbove50kRecord,
   isVModaRecord,
   isDemoRecord,
+  isKantoRecord,
   type MetricsConfig,
 } from "@/lib/metrics/compute";
 import type { FieldKey } from "@/types/operations";
 import { Above50kSection } from "@/components/dashboard/above-50k-section";
 import { VModaSection } from "@/components/dashboard/vmoda-section";
 import { DemoSection } from "@/components/dashboard/demo-section";
+import { KantoSection } from "@/components/dashboard/kanto-section";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LiveRefreshHeader } from "@/components/dashboard/live-refresh-header";
@@ -106,10 +109,12 @@ export default async function DashboardPage(props: DashboardPageProps) {
   const above50kRecords = dataset.records.filter(isAbove50kRecord);
   const vmodaRecords = dataset.records.filter(isVModaRecord);
   const demoRecords = dataset.records.filter(isDemoRecord);
+  const kantoRecords = dataset.records.filter(isKantoRecord);
 
   const above50kKpis = computeKpis(above50kRecords, parsedRange, metricsConfig);
   const vmodaKpis = computeVModaKpis(dataset.records, parsedRange, metricsConfig);
   const demoKpis = computeDemoKpis(dataset.records, parsedRange, metricsConfig);
+  const kantoKpis = computeKantoKpis(dataset.records, parsedRange, metricsConfig);
 
   const exportUrl = `/api/operations/export?range=${encodeURIComponent(
     parsedRange.key
@@ -134,24 +139,30 @@ export default async function DashboardPage(props: DashboardPageProps) {
         <DateRangeFilter currentRange={parsedRange} />
       </div>
 
-      {/* Sync Warnings Banner */}
-      {dataset.warnings && dataset.warnings.length > 0 && (
-        <div
-          role="status"
-          className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5"
-        >
-          <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-          <div className="flex-1 leading-relaxed">
-            <span className="font-semibold">Sync notice: </span>
-            {dataset.warnings[0].message}
-            {dataset.warnings.length > 1 && (
-              <span className="ml-1 text-amber-700 dark:text-amber-300">
-                (+{dataset.warnings.length - 1} more warnings)
-              </span>
-            )}
+      {/* Sync Warnings Banner: surface only actionable data warnings (exclude benign multi-sheet header notes) */}
+      {(() => {
+        const actionableWarnings = (dataset.warnings || []).filter(
+          (w) => w.code !== "DUPLICATE_HEADER" && w.code !== "MISSING_COLUMN"
+        );
+        if (actionableWarnings.length === 0) return null;
+        return (
+          <div
+            role="status"
+            className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5"
+          >
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <div className="flex-1 leading-relaxed">
+              <span className="font-semibold">Sync notice: </span>
+              {actionableWarnings[0].message}
+              {actionableWarnings.length > 1 && (
+                <span className="ml-1 text-amber-700 dark:text-amber-300">
+                  (+{actionableWarnings.length - 1} more warnings)
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Above 50k Orders Section with Glassmorphic Cards & Drill-down Modal */}
       <Above50kSection records={above50kRecords} kpis={above50kKpis} range={parsedRange} />
@@ -161,6 +172,9 @@ export default async function DashboardPage(props: DashboardPageProps) {
 
       {/* Demo Units To be Dispatch Section with Glassmorphic Cards & Drill-down Modal */}
       <DemoSection records={demoRecords} kpis={demoKpis} range={parsedRange} />
+
+      {/* Kanto Products Section with Glassmorphic Cards & Drill-down Modal */}
+      <KantoSection records={kantoRecords} kpis={kantoKpis} range={parsedRange} />
     </div>
   );
 }

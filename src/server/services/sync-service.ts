@@ -93,12 +93,13 @@ export async function runSync(opts: { trigger: SyncTrigger; actor?: SessionUser 
       allRowsBlank += mapped.rowsBlank;
       allRecords = allRecords.concat(mapped.records);
 
-      // Only propagate MISSING_COLUMN warnings for the primary worksheet to avoid false alarms on subsheets with different headers
-      if (wsIdx === 0 || targetWorksheets.length === 1) {
-        warnings.push(...mapped.warnings);
-      } else {
-        warnings.push(...mapped.warnings.filter((w) => w.code !== "MISSING_COLUMN"));
-      }
+      // Multi-sheet operations pipelines naturally have differing column headers across tabs
+      // and intentionally repeated headers (e.g. intake "Status" vs fulfillment "Status" in Kanto).
+      // Filter out benign MISSING_COLUMN and DUPLICATE_HEADER notices so they do not surface as false alarms.
+      const relevantWarnings = mapped.warnings.filter(
+        (w) => w.code !== "MISSING_COLUMN" && w.code !== "DUPLICATE_HEADER"
+      );
+      warnings.push(...relevantWarnings);
 
       if (read.truncated) {
         warnings.push({

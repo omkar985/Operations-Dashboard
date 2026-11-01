@@ -82,9 +82,26 @@ export function isDemoRecord(r: OpsRecord): boolean {
   return false;
 }
 
+/** Checks if a record belongs to the Kanto subsheet. */
+export function isKantoRecord(r: OpsRecord): boolean {
+  if (r.subsheet) {
+    const s = r.subsheet.toLowerCase().trim();
+    if (s.includes("kanto")) return true;
+  }
+  if (r.raw) {
+    return Boolean(
+      getRecordCol(r, "Assembling Due Date") !== null ||
+      getRecordCol(r, "Assembled? ") !== null ||
+      getRecordCol(r, "Assembled?") !== null ||
+      getRecordCol(r, "Image Drive Link (Chennai)") !== null
+    );
+  }
+  return false;
+}
+
 /** Checks if a record belongs to the Above 50k Orders subsheet. */
 export function isAbove50kRecord(r: OpsRecord): boolean {
-  return !isVModaRecord(r) && !isDemoRecord(r);
+  return !isVModaRecord(r) && !isDemoRecord(r) && !isKantoRecord(r);
 }
 
 /**
@@ -192,6 +209,99 @@ export function isDemoProcessedNotDispatched(r: OpsRecord): boolean {
   return isGenAwbYes && isAwbFilled && !isBlocked;
 }
 
+/** Returns the fulfillment status for Kanto records (from Column 10 / raw Status). */
+export function getKantoStatus(r: OpsRecord): string {
+  const rawStatus = getRecordCol(r, "Status");
+  if (rawStatus !== null && rawStatus !== undefined) return rawStatus.trim();
+  return "";
+}
+
+/** Extracts the Assembling Due Date for Kanto records. */
+export function getKantoAssemblingDueDate(r: OpsRecord): Date | null {
+  const rawDate =
+    getRecordCol(r, "Assembling Due Date") ??
+    getRecordCol(r, "Assembling Due Date ") ??
+    getRecordCol(r, "Due Date");
+  if (!rawDate || rawDate.trim() === "" || rawDate.trim() === "(blank)") return null;
+  const trimmed = rawDate.trim();
+  if (/^\d{4,6}(\.\d+)?$/.test(trimmed)) {
+    const iso = serialToIso(Number(trimmed));
+    if (iso) return new Date(iso);
+  }
+  const iso =
+    parseSheetDate(trimmed, "ISO") ??
+    parseSheetDate(trimmed, "DMY") ??
+    parseSheetDate(trimmed, "MDY");
+  if (iso) {
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  const direct = new Date(trimmed);
+  return Number.isNaN(direct.getTime()) ? null : direct;
+}
+
+export function isKantoDueDateOverdue(dueDate: Date, now: Date = new Date()): boolean {
+  const dueMidnight = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
+  const todayMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return todayMidnight > dueMidnight;
+}
+
+export function isKantoDueDateWithin(dueDate: Date, now: Date = new Date()): boolean {
+  const dueMidnight = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
+  const todayMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return todayMidnight <= dueMidnight;
+}
+
+/**
+ * Kanto Filter 1: Waiting on Assembly
+ * Criteria: In "Kanto" sheet; "Assembled? " column is Blank.
+ */
+export function isKantoWaitingOnAssembly(r: OpsRecord): boolean {
+  if (!isKantoRecord(r)) return false;
+  const orderNo = getRecordCol(r, "Order Number") ?? getRecordCol(r, "Order no.") ?? r.id;
+  if (!orderNo && !getRecordCol(r, "SKU")) return false;
+
+  const assembled = (
+    getRecordCol(r, "Assembled? ") ??
+    getRecordCol(r, "Assembled?") ??
+    getRecordCol(r, "Assembled") ??
+    ""
+  ).trim();
+  return !assembled || assembled.toLowerCase() === "(blank)";
+}
+
+/**
+ * Kanto Filter 2: Waiting on Process
+ * Criteria: In "Kanto" sheet; "Status" does not have "Processed/Fulfilled" OR "Cancelled" OR "Delivered" OR "Dispatched".
+ */
+export function isKantoWaitingOnProcess(r: OpsRecord): boolean {
+  if (!isKantoRecord(r)) return false;
+  const orderNo = getRecordCol(r, "Order Number") ?? getRecordCol(r, "Order no.") ?? r.id;
+  if (!orderNo && !getRecordCol(r, "SKU")) return false;
+
+  const status = getKantoStatus(r).toLowerCase().trim();
+  const isExcluded =
+    status.includes("processed") ||
+    status.includes("fulfilled") ||
+    status.includes("cancel") ||
+    status.includes("deliver") ||
+    status.includes("dispatch");
+  return !isExcluded;
+}
+
+/**
+ * Kanto Filter 3: Dispatched
+ * Criteria: In "Kanto" sheet; "Status" has "Dispatched" OR "Delivered".
+ */
+export function isKantoDispatched(r: OpsRecord): boolean {
+  if (!isKantoRecord(r)) return false;
+  const orderNo = getRecordCol(r, "Order Number") ?? getRecordCol(r, "Order no.") ?? r.id;
+  if (!orderNo && !getRecordCol(r, "SKU")) return false;
+
+  const status = getKantoStatus(r).toLowerCase().trim();
+  return status.includes("dispatch") || status.includes("deliver");
+}
+
 /** Extracts and normalizes the order date from record createdAt or raw columns. */
 export function getRecordOrderDate(r: OpsRecord): Date | null {
   // If record belongs to Above 50k Orders, strictly apply date filter on "Order Date" column:
@@ -258,6 +368,8 @@ export function getRecordAmount(r: OpsRecord): number | null {
     getRecordCol(r, "Amt") ??
     getRecordCol(r, "Amount") ??
     getRecordCol(r, "Order Amount") ??
+    getRecordCol(r, "Order Value ") ??
+    getRecordCol(r, "Order Value") ??
     getRecordCol(r, "Total");
   if (rawAmt === null || rawAmt === undefined) return null;
   const cleaned = String(rawAmt).replace(/[^0-9.-]+/g, "");
@@ -308,6 +420,9 @@ export type KpiKey =
   | "vmoda_pending_dispatch"
   | "demo_received_not_processed"
   | "demo_processed_not_dispatched"
+  | "kanto_waiting_assembly"
+  | "kanto_waiting_process"
+  | "kanto_dispatched"
   | "open"
   | "created"
   | "resolved"
@@ -338,6 +453,9 @@ export interface Kpi {
   target?: number;
   /** Total order value in INR (e.g. for high-value orders). */
   totalAmount?: number;
+  /** Breakdown for Kanto Waiting on Process */
+  overdueCount?: number;
+  withinDueCount?: number;
 }
 
 function mk(
@@ -706,6 +824,152 @@ export function computeDemoKpis(
   });
 
   return [receivedNotProc, procNotDisp];
+}
+
+export function computeKantoKpis(
+  records: OpsRecord[],
+  range: DateRange,
+  cfg: MetricsConfig,
+): Kpi[] {
+  const kantoRecords = records.filter(isKantoRecord);
+  const prev = previousRange(range);
+  const starts = bucketStarts(range);
+  const step = granularityFor(range) === "day" ? DAY : 7 * DAY;
+
+  // 1. Waiting on Assembly
+  const waitingAssemblyOrders = kantoRecords.filter(isKantoWaitingOnAssembly);
+  const waitingAssemblyTotalAmt = waitingAssemblyOrders.reduce(
+    (sum, r) => sum + (getRecordAmount(r) ?? 0),
+    0
+  );
+  const waitingAssembly = mk(
+    {
+      key: "kanto_waiting_assembly",
+      label: "Waiting on Assembly",
+      definition: 'In "Kanto" sheet, "Assembled? " column is Blank.',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg
+  );
+  waitingAssembly.available = true;
+  waitingAssembly.value = waitingAssemblyOrders.length;
+  waitingAssembly.totalAmount = waitingAssemblyTotalAmt;
+  const curAssemblyInRange = kantoRecords.filter(
+    (r) => isMonthlyReceived(r, range, cfg.now) && isKantoWaitingOnAssembly(r)
+  ).length;
+  const prevAssemblyInRange = kantoRecords.filter(
+    (r) => isMonthlyReceived(r, prev, cfg.now) && isKantoWaitingOnAssembly(r)
+  ).length;
+  waitingAssembly.previous = prevAssemblyInRange;
+  waitingAssembly.deltaPct = pctDelta(curAssemblyInRange, prevAssemblyInRange);
+  waitingAssembly.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return kantoRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi && isKantoWaitingOnAssembly(r);
+    }).length;
+  });
+
+  // 2. Waiting on Process
+  const waitingProcessOrders = kantoRecords.filter(isKantoWaitingOnProcess);
+  const waitingProcessTotalAmt = waitingProcessOrders.reduce(
+    (sum, r) => sum + (getRecordAmount(r) ?? 0),
+    0
+  );
+
+  let overdueCount = 0;
+  let withinDueCount = 0;
+  waitingProcessOrders.forEach((r) => {
+    const dueDate = getKantoAssemblingDueDate(r);
+    if (dueDate) {
+      if (isKantoDueDateOverdue(dueDate, cfg.now)) {
+        overdueCount++;
+      } else {
+        withinDueCount++;
+      }
+    } else {
+      withinDueCount++;
+    }
+  });
+
+  const waitingProcess = mk(
+    {
+      key: "kanto_waiting_process",
+      label: "Waiting on Process",
+      definition:
+        'In "Kanto" sheet, "Status" does not have "Processed/Fulfilled", "Cancelled", "Delivered", or "Dispatched". Evaluated against "Assembling Due Date" into Overdue and Within Due Date.',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg
+  );
+  waitingProcess.available = true;
+  waitingProcess.value = waitingProcessOrders.length;
+  waitingProcess.totalAmount = waitingProcessTotalAmt;
+  waitingProcess.overdueCount = overdueCount;
+  waitingProcess.withinDueCount = withinDueCount;
+  const curProcessInRange = kantoRecords.filter(
+    (r) => isMonthlyReceived(r, range, cfg.now) && isKantoWaitingOnProcess(r)
+  ).length;
+  const prevProcessInRange = kantoRecords.filter(
+    (r) => isMonthlyReceived(r, prev, cfg.now) && isKantoWaitingOnProcess(r)
+  ).length;
+  waitingProcess.previous = prevProcessInRange;
+  waitingProcess.deltaPct = pctDelta(curProcessInRange, prevProcessInRange);
+  waitingProcess.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return kantoRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi && isKantoWaitingOnProcess(r);
+    }).length;
+  });
+
+  // 3. Dispatched
+  const dispatchedOrders = kantoRecords.filter(isKantoDispatched);
+  const dispatchedTotalAmt = dispatchedOrders.reduce(
+    (sum, r) => sum + (getRecordAmount(r) ?? 0),
+    0
+  );
+  const dispatched = mk(
+    {
+      key: "kanto_dispatched",
+      label: "Dispatched",
+      definition: 'In "Kanto" sheet, "Status" has value "Dispatched" or "Delivered".',
+      requires: [],
+      unit: "count",
+      good: "up",
+    },
+    cfg
+  );
+  dispatched.available = true;
+  dispatched.value = dispatchedOrders.length;
+  dispatched.totalAmount = dispatchedTotalAmt;
+  const curDispInRange = kantoRecords.filter(
+    (r) => isMonthlyReceived(r, range, cfg.now) && isKantoDispatched(r)
+  ).length;
+  const prevDispInRange = kantoRecords.filter(
+    (r) => isMonthlyReceived(r, prev, cfg.now) && isKantoDispatched(r)
+  ).length;
+  dispatched.previous = prevDispInRange;
+  dispatched.deltaPct = pctDelta(curDispInRange, prevDispInRange);
+  dispatched.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return kantoRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return !Number.isNaN(t) && t >= lo && t < hi && isKantoDispatched(r);
+    }).length;
+  });
+
+  return [waitingAssembly, waitingProcess, dispatched];
 }
 
 // ----------------------------------------------------------------------------- trend

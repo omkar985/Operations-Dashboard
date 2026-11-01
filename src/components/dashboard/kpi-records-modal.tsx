@@ -13,12 +13,12 @@ import {
   Clock,
   Truck,
   Layers,
-  ArrowUpDown,
   Users,
   Palette,
   Sparkles,
   PackageCheck,
   ClipboardList,
+  Wrench,
 } from "lucide-react";
 import type { OpsRecord } from "@/types/operations";
 import type { KpiKey, DateRange } from "@/lib/metrics/compute";
@@ -42,6 +42,14 @@ import {
   isDemoProcessedNotDispatched,
   isDemoRecord,
   isVModaRecord,
+  isKantoRecord,
+  isKantoWaitingOnAssembly,
+  isKantoWaitingOnProcess,
+  isKantoDispatched,
+  getKantoStatus,
+  getKantoAssemblingDueDate,
+  isKantoDueDateOverdue,
+  isKantoDueDateWithin,
 } from "@/lib/metrics/compute";
 
 interface KpiRecordsModalProps {
@@ -126,6 +134,7 @@ export function KpiRecordsModal({
   range,
 }: KpiRecordsModalProps) {
   const [search, setSearch] = useState("");
+  const [dueFilter, setDueFilter] = useState<"all" | "overdue" | "within">("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<"date" | "amount" | "order">("date");
   const [sortAsc, setSortAsc] = useState(false);
@@ -175,6 +184,15 @@ export function KpiRecordsModal({
     if (kpiKey === "demo_processed_not_dispatched") {
       return records.filter(isDemoProcessedNotDispatched);
     }
+    if (kpiKey === "kanto_waiting_assembly") {
+      return records.filter(isKantoWaitingOnAssembly);
+    }
+    if (kpiKey === "kanto_waiting_process") {
+      return records.filter(isKantoWaitingOnProcess);
+    }
+    if (kpiKey === "kanto_dispatched") {
+      return records.filter(isKantoDispatched);
+    }
     return records;
   }, [kpiKey, records, range]);
 
@@ -188,9 +206,26 @@ export function KpiRecordsModal({
     return cohortRecords.length > 0 && cohortRecords.every(isDemoRecord);
   }, [kpiKey, cohortRecords]);
 
+  const isKantoCohort = useMemo(() => {
+    if (kpiKey?.startsWith("kanto_")) return true;
+    return cohortRecords.length > 0 && cohortRecords.every(isKantoRecord);
+  }, [kpiKey, cohortRecords]);
+
   // Search filter & sort
   const filteredRecords = useMemo(() => {
     let result = cohortRecords;
+
+    // Apply Due Date filter for Kanto Waiting on Process
+    if (kpiKey === "kanto_waiting_process" && dueFilter !== "all") {
+      result = result.filter((r) => {
+        const dueDate = getKantoAssemblingDueDate(r);
+        if (!dueDate) return dueFilter === "within";
+        return dueFilter === "overdue"
+          ? isKantoDueDateOverdue(dueDate)
+          : isKantoDueDateWithin(dueDate);
+      });
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase().trim();
       result = result.filter((r) => {
@@ -215,9 +250,16 @@ export function KpiRecordsModal({
           ""
         ).toLowerCase();
         const status = (
-          getRecordCol(r, "Dispatch status") ??
-          getRecordCol(r, "Status") ??
-          getRecordStatus(r)
+          getKantoStatus(r) ||
+          getRecordCol(r, "Dispatch status") ||
+          getRecordCol(r, "Status") ||
+          getRecordStatus(r) ||
+          ""
+        ).toLowerCase();
+        const assembled = (
+          getRecordCol(r, "Assembled? ") ??
+          getRecordCol(r, "Assembled?") ??
+          ""
         ).toLowerCase();
         const action = (
           getRecordCol(r, "AWB ") ??
@@ -231,6 +273,7 @@ export function KpiRecordsModal({
           sku.includes(q) ||
           customer.includes(q) ||
           status.includes(q) ||
+          assembled.includes(q) ||
           action.includes(q)
         );
       });
@@ -264,7 +307,7 @@ export function KpiRecordsModal({
       const dateB = getRecordOrderDate(b)?.getTime() ?? 0;
       return sortAsc ? dateA - dateB : dateB - dateA;
     });
-  }, [cohortRecords, search, sortField, sortAsc]);
+  }, [cohortRecords, search, sortField, sortAsc, dueFilter, kpiKey]);
 
   // Aggregate stats
   const totalAmount = useMemo(() => {
@@ -334,6 +377,75 @@ export function KpiRecordsModal({
       const link = document.createElement("a");
       link.href = url;
       link.download = `${kpiTitle.toLowerCase().replace(/\s+/g, "-")}-demo-units.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (isKantoCohort) {
+      const headers = [
+        "Order Number",
+        "Order Date",
+        "Amount (INR)",
+        "SKU",
+        "Assembled?",
+        "Fulfillment Status",
+        "Assembling Due Date",
+        "Due Status",
+        "Shopify Admin URL",
+      ];
+
+      const rows = filteredRecords.map((r) => {
+        const rawOrderNo =
+          getRecordCol(r, "Order Number") ??
+          getRecordCol(r, "Order no.") ??
+          getRecordCol(r, "Order No") ??
+          r.id ??
+          "";
+        const cleanId = String(rawOrderNo).replace(/^#/, "").trim();
+        const orderDate = formatDateDisplay(getRecordOrderDate(r));
+        const amt = getRecordAmount(r) ?? 0;
+        const sku = getRecordCol(r, "SKU") ?? "";
+        const assembled =
+          getRecordCol(r, "Assembled? ") ??
+          getRecordCol(r, "Assembled?") ??
+          getRecordCol(r, "Assembled") ??
+          "";
+        const status = getKantoStatus(r) || "Pending";
+        const dueDate = getKantoAssemblingDueDate(r);
+        const dueDateStr = formatDateDisplay(dueDate);
+        const dueStatus = dueDate
+          ? isKantoDueDateOverdue(dueDate)
+            ? "Overdue"
+            : "Within Due Date"
+          : "—";
+        const rawShopifyLink = (getRecordCol(r, "Shopify Order Link") ?? "").trim();
+        const shopifyUrl =
+          rawShopifyLink && rawShopifyLink.startsWith("http")
+            ? rawShopifyLink
+            : `https://admin.shopify.com/store/headphonezone/orders?query=${encodeURIComponent(
+                cleanId
+              )}`;
+
+        return [
+          `"${String(rawOrderNo).replace(/"/g, '""')}"`,
+          `"${orderDate}"`,
+          amt,
+          `"${sku.replace(/"/g, '""')}"`,
+          `"${assembled.replace(/"/g, '""')}"`,
+          `"${status.replace(/"/g, '""')}"`,
+          `"${dueDateStr}"`,
+          `"${dueStatus}"`,
+          `"${shopifyUrl}"`,
+        ].join(",");
+      });
+
+      const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${kpiTitle.toLowerCase().replace(/\s+/g, "-")}-kanto-orders.csv`;
       link.click();
       URL.revokeObjectURL(url);
       return;
@@ -480,18 +592,25 @@ export function KpiRecordsModal({
       ? ClipboardList
       : kpiKey === "demo_processed_not_dispatched"
       ? PackageCheck
+      : kpiKey === "kanto_waiting_assembly"
+      ? Wrench
+      : kpiKey === "kanto_waiting_process"
+      ? Clock
+      : kpiKey === "kanto_dispatched"
+      ? Truck
       : Layers;
 
   const headerTheme =
     kpiKey === "not_yet_processed" ||
     kpiKey === "vmoda_waiting_engraving" ||
-    kpiKey === "demo_received_not_processed"
+    kpiKey === "demo_received_not_processed" ||
+    kpiKey === "kanto_waiting_assembly"
       ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
-      : kpiKey === "not_yet_delivered"
+      : kpiKey === "not_yet_delivered" || kpiKey === "kanto_waiting_process"
       ? "text-indigo-500 bg-indigo-500/10 border-indigo-500/20"
       : kpiKey === "vmoda_waiting_logo"
       ? "text-purple-500 bg-purple-500/10 border-purple-500/20"
-      : kpiKey === "vmoda_pending_dispatch"
+      : kpiKey === "vmoda_pending_dispatch" || kpiKey === "kanto_dispatched"
       ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
       : "text-[#0284C7] bg-[#0284C7]/10 border-[#0284C7]/20";
 
@@ -529,7 +648,9 @@ export function KpiRecordsModal({
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {isDemoCohort
+                {isKantoCohort
+                  ? "Kanto Products"
+                  : isDemoCohort
                   ? "Demo Units To be Dispatch"
                   : isVModaCohort
                   ? "V-MODA Engraving Orders"
@@ -571,29 +692,78 @@ export function KpiRecordsModal({
 
         {/* Filter & Search Bar */}
         <div className="shrink-0 p-3 sm:px-6 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={
-                isDemoCohort
-                  ? "Search by order #, product, customer, AWB, status..."
-                  : isVModaCohort
-                  ? "Search by order #, SKU, customer email, status, remark..."
-                  : "Search by order #, SKU, customer, courier, status..."
-              }
-              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0284C7]/30 focus:border-[#0284C7]"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 max-w-2xl">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={
+                  isKantoCohort
+                    ? "Search by order #, SKU, assembled, status..."
+                    : isDemoCohort
+                    ? "Search by order #, product, customer, AWB, status..."
+                    : isVModaCohort
+                    ? "Search by order #, SKU, customer email, status, remark..."
+                    : "Search by order #, SKU, customer, courier, status..."
+                }
+                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0284C7]/30 focus:border-[#0284C7]"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Sub-filter tabs for Kanto Waiting on Process */}
+            {kpiKey === "kanto_waiting_process" && (
+              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setDueFilter("all")}
+                  className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                    dueFilter === "all"
+                      ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  All ({cohortRecords.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDueFilter("overdue")}
+                  className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                    dueFilter === "overdue"
+                      ? "bg-rose-500 text-white shadow-sm"
+                      : "text-rose-600 dark:text-rose-400 hover:text-rose-700"
+                  }`}
+                >
+                  Overdue ({cohortRecords.filter((r) => {
+                    const d = getKantoAssemblingDueDate(r);
+                    return d ? isKantoDueDateOverdue(d) : false;
+                  }).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDueFilter("within")}
+                  className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                    dueFilter === "within"
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"
+                  }`}
+                >
+                  Within Due Date ({cohortRecords.filter((r) => {
+                    const d = getKantoAssemblingDueDate(r);
+                    return d ? isKantoDueDateWithin(d) : true;
+                  }).length})
+                </button>
+              </div>
             )}
           </div>
 
@@ -975,6 +1145,174 @@ export function KpiRecordsModal({
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
                             Pending
                           </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : isKantoCohort ? (
+            /* Kanto Products Table */
+            <table className="w-full text-left text-xs border-collapse min-w-[760px]">
+              <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 font-semibold uppercase tracking-wider text-[10.5px]">
+                <tr>
+                  <th className="py-2.5 px-3 sm:px-4">Order Number</th>
+                  <th className="py-2.5 px-3 sm:px-4">Order Date</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-right">Amount</th>
+                  <th className="py-2.5 px-3 sm:px-4">SKU / Product</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Assembled?</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Fulfillment Status</th>
+                  <th className="py-2.5 px-3 sm:px-4">Assembling Due Date</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Due Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                {filteredRecords.map((r, i) => {
+                  const rawOrderNo =
+                    getRecordCol(r, "Order Number") ??
+                    getRecordCol(r, "Order no.") ??
+                    getRecordCol(r, "Order No") ??
+                    r.id ??
+                    `Row ${r.row}`;
+                  const cleanOrderId = String(rawOrderNo).replace(/^#/, "").trim();
+                  const rawShopifyLink = (getRecordCol(r, "Shopify Order Link") ?? "").trim();
+                  const shopifyUrl =
+                    rawShopifyLink && rawShopifyLink.startsWith("http")
+                      ? rawShopifyLink
+                      : `https://admin.shopify.com/store/headphonezone/orders?query=${encodeURIComponent(
+                          cleanOrderId
+                        )}`;
+
+                  const orderDate = formatDateDisplay(getRecordOrderDate(r));
+                  const amt = getRecordAmount(r);
+                  const sku = getRecordCol(r, "SKU") ?? "—";
+                  const assembledRaw = (
+                    getRecordCol(r, "Assembled? ") ??
+                    getRecordCol(r, "Assembled?") ??
+                    getRecordCol(r, "Assembled") ??
+                    ""
+                  ).trim();
+                  const isAssembledYes = assembledRaw.toLowerCase() === "yes";
+                  const isAssembledNo = assembledRaw.toLowerCase() === "no";
+
+                  const status = getKantoStatus(r) || "Pending";
+                  const dueDate = getKantoAssemblingDueDate(r);
+                  const dueDateDisplay = formatDateDisplay(dueDate);
+
+                  let isOverdue = false;
+                  if (dueDate) {
+                    isOverdue = isKantoDueDateOverdue(dueDate);
+                  }
+
+                  // Status badge styling
+                  let statusBadgeClass =
+                    "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+                  const lowerStatus = status.toLowerCase();
+                  if (lowerStatus.includes("deliver")) {
+                    statusBadgeClass =
+                      "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40";
+                  } else if (lowerStatus.includes("dispatch")) {
+                    statusBadgeClass =
+                      "bg-teal-50 dark:bg-teal-950/50 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800/40";
+                  } else if (lowerStatus.includes("transit") || lowerStatus.includes("delivery")) {
+                    statusBadgeClass =
+                      "bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800/40";
+                  } else if (lowerStatus.includes("processed") || lowerStatus.includes("fulfill")) {
+                    statusBadgeClass =
+                      "bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/40";
+                  } else if (lowerStatus.includes("cancel")) {
+                    statusBadgeClass =
+                      "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/40";
+                  } else if (lowerStatus.includes("stock")) {
+                    statusBadgeClass =
+                      "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40";
+                  }
+
+                  return (
+                    <tr
+                      key={r.id || `row-${r.row}-${i}`}
+                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                    >
+                      {/* 1. Order Number */}
+                      <td className="py-2.5 px-3 sm:px-4 font-mono font-medium whitespace-nowrap">
+                        <a
+                          href={shopifyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[#0284C7] dark:text-[#38BDF8] hover:underline font-semibold"
+                          title="Open Order in Shopify Admin"
+                        >
+                          <span>{String(rawOrderNo).startsWith("#") ? rawOrderNo : `#${rawOrderNo}`}</span>
+                          <ExternalLink className="w-3 h-3 opacity-70" />
+                        </a>
+                      </td>
+
+                      {/* 2. Order Date */}
+                      <td className="py-2.5 px-3 sm:px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {orderDate}
+                      </td>
+
+                      {/* 3. Amount */}
+                      <td className="py-2.5 px-3 sm:px-4 text-right font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                        {amt !== null ? `₹${amt.toLocaleString("en-IN")}` : "—"}
+                      </td>
+
+                      {/* 4. SKU */}
+                      <td className="py-2.5 px-3 sm:px-4 max-w-[240px]">
+                        <span className="line-clamp-2 text-slate-700 dark:text-slate-300 font-sans" title={sku}>
+                          {sku}
+                        </span>
+                      </td>
+
+                      {/* 5. Assembled? */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        {isAssembledYes ? (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                            Yes
+                          </span>
+                        ) : isAssembledNo ? (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40">
+                            No
+                          </span>
+                        ) : (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40">
+                            Blank / Pending
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 6. Fulfillment Status */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusBadgeClass} whitespace-nowrap`}
+                          title={status}
+                        >
+                          {status}
+                        </span>
+                      </td>
+
+                      {/* 7. Assembling Due Date */}
+                      <td className="py-2.5 px-3 sm:px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {dueDateDisplay}
+                      </td>
+
+                      {/* 8. Due Status */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        {dueDate ? (
+                          isOverdue ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/50">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                              Overdue
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/50">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              Within Due Date
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-500 text-[11px]">—</span>
                         )}
                       </td>
                     </tr>

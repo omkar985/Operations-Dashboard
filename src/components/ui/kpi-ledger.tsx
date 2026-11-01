@@ -18,6 +18,7 @@ import {
   Sparkles,
   PackageCheck,
   ClipboardList,
+  Wrench,
 } from "lucide-react";
 
 interface KpiLedgerProps {
@@ -173,6 +174,55 @@ const KPI_CONFIG: Record<
       { label: "Generate AWB?", value: 'Filled with "Yes"' },
       { label: "AWB Number", value: "Is Filled" },
       { label: "Dispatch status", value: 'Excludes "Dispatched", "Delivered", "Cancelled", "RTO", "Return"' },
+    ],
+  },
+  kanto_waiting_assembly: {
+    icon: Wrench,
+    tag: "Awaiting Assembly",
+    tagStyle: "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/50",
+    iconStyle: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20",
+    glowGradient: "from-amber-500/8 via-amber-500/3 to-transparent",
+    sparklineColor: "#F59E0B",
+    sublabel: 'Pending "Assembled?" confirmation',
+    filterTitle: "Waiting on Assembly Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"Kanto"' },
+      { label: "Assembled? Column", value: "Is Blank" },
+    ],
+  },
+  kanto_waiting_process: {
+    icon: Clock,
+    tag: "Processing Queue",
+    tagStyle: "bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/50",
+    iconStyle: "text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
+    glowGradient: "from-indigo-500/8 via-indigo-500/3 to-transparent",
+    sparklineColor: "#6366F1",
+    sublabel: "Awaiting fulfillment processing",
+    filterTitle: "Waiting on Process Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"Kanto"' },
+      {
+        label: "Status Column",
+        value: 'Excludes "Processed/Fulfilled", "Cancelled", "Delivered", "Dispatched"',
+      },
+      {
+        label: "Due Date Check",
+        value: "Today <= Due Date: Within Due Date | Today > Due Date: Overdue",
+      },
+    ],
+  },
+  kanto_dispatched: {
+    icon: Truck,
+    tag: "Dispatched & Delivered",
+    tagStyle: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200/80 dark:border-emerald-800/50",
+    iconStyle: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    glowGradient: "from-emerald-500/8 via-emerald-500/3 to-transparent",
+    sparklineColor: "#10B981",
+    sublabel: "Fulfilled and shipped orders",
+    filterTitle: "Dispatched Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"Kanto"' },
+      { label: "Status Column", value: 'Has value "Dispatched" or "Delivered"' },
     ],
   },
 };
@@ -331,6 +381,20 @@ export function KpiLedger({ kpis, className = "", onCardClick }: KpiLedgerProps)
                       </div>
                     )}
                   </div>
+
+                  {/* Optional Due Date Breakdown for Kanto Waiting on Process */}
+                  {kpi.overdueCount !== undefined && kpi.withinDueCount !== undefined && (
+                    <div className="flex items-center gap-1.5 mt-2.5">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/50">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                        Overdue: {kpi.overdueCount}
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/50">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        Within Due: {kpi.withinDueCount}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Bottom Row: Total Value Pill & Prior Period Trend */}
