@@ -19,6 +19,7 @@ import {
   PackageCheck,
   ClipboardList,
   Wrench,
+  HelpCircle,
 } from "lucide-react";
 
 interface KpiLedgerProps {
@@ -223,6 +224,40 @@ const KPI_CONFIG: Record<
     filterRules: [
       { label: "Sheet Tab", value: '"Kanto"' },
       { label: "Status Column", value: 'Has value "Dispatched" or "Delivered"' },
+    ],
+  },
+  unboxed_waiting_confirmation: {
+    icon: HelpCircle,
+    tag: "Pending Availability",
+    tagStyle: "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/50",
+    iconStyle: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20",
+    glowGradient: "from-amber-500/8 via-amber-500/3 to-transparent",
+    sparklineColor: "#F59E0B",
+    sublabel: 'Pending "Availability" (blank)',
+    filterTitle: "Waiting on Confirmation Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"Unboxed v2"' },
+      { label: "Date Range", value: "Current selected filter period" },
+      { label: "Availability Column", value: "Is Blank" },
+    ],
+  },
+  unboxed_waiting_process: {
+    icon: Clock,
+    tag: "Awaiting Fulfillment",
+    tagStyle: "bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/50",
+    iconStyle: "text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
+    glowGradient: "from-indigo-500/8 via-indigo-500/3 to-transparent",
+    sparklineColor: "#6366F1",
+    sublabel: "Stock confirmed, pending processing",
+    filterTitle: "Waiting on Process Filter",
+    filterRules: [
+      { label: "Sheet Tab", value: '"Unboxed v2"' },
+      { label: "Date Range", value: "Current selected filter period" },
+      { label: "Availability Column", value: 'Has value "Yes"' },
+      {
+        label: "Status Column",
+        value: 'Not equal to "Processed" and does not contain "Cancelled"',
+      },
     ],
   },
 };

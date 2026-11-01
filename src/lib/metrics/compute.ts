@@ -99,9 +99,27 @@ export function isKantoRecord(r: OpsRecord): boolean {
   return false;
 }
 
+/** Checks if a record belongs to the Unboxed v2 subsheet. */
+export function isUnboxedRecord(r: OpsRecord): boolean {
+  if (r.subsheet) {
+    const s = r.subsheet.toLowerCase().trim();
+    if (s.includes("unboxed")) return true;
+  }
+  if (r.raw) {
+    return Boolean(
+      getRecordCol(r, "Confirmation Due Date") !== null ||
+      getRecordCol(r, "Availability") !== null ||
+      getRecordCol(r, "Availability ") !== null ||
+      getRecordCol(r, "Other Color/Variant Availability") !== null ||
+      getRecordCol(r, "Automation (Inventory Zero)") !== null
+    );
+  }
+  return false;
+}
+
 /** Checks if a record belongs to the Above 50k Orders subsheet. */
 export function isAbove50kRecord(r: OpsRecord): boolean {
-  return !isVModaRecord(r) && !isDemoRecord(r) && !isKantoRecord(r);
+  return !isVModaRecord(r) && !isDemoRecord(r) && !isKantoRecord(r) && !isUnboxedRecord(r);
 }
 
 /**
@@ -110,7 +128,13 @@ export function isAbove50kRecord(r: OpsRecord): boolean {
  * Optional range filter: Current month or based on filter applied.
  */
 export function isNotYetProcessed(r: OpsRecord, range?: DateRange, now?: Date): boolean {
-  if (range && !isMonthlyReceived(r, range, now)) {
+  const hasRange = Boolean(
+    range &&
+    typeof range === "object" &&
+    range.from instanceof Date &&
+    range.to instanceof Date
+  );
+  if (hasRange && !isMonthlyReceived(r, range, now)) {
     return false;
   }
   const actionTaken = getRecordCol(r, "Action taken");
@@ -127,7 +151,13 @@ export function isNotYetProcessed(r: OpsRecord, range?: DateRange, now?: Date): 
  * Optional range filter: Current month or based on filter applied.
  */
 export function isNotYetDelivered(r: OpsRecord, range?: DateRange, now?: Date): boolean {
-  if (range && !isMonthlyReceived(r, range, now)) {
+  const hasRange = Boolean(
+    range &&
+    typeof range === "object" &&
+    range.from instanceof Date &&
+    range.to instanceof Date
+  );
+  if (hasRange && !isMonthlyReceived(r, range, now)) {
     return false;
   }
   const delivered = getRecordCol(r, "Delivered yes/no)");
@@ -302,6 +332,99 @@ export function isKantoDispatched(r: OpsRecord): boolean {
   return status.includes("dispatch") || status.includes("deliver");
 }
 
+/**
+ * Unboxed Filter 1: Waiting on Confirmation
+ * Criteria: In "Unboxed v2" sheet; "Availability " column is blank.
+ * Respects active selected date range filter.
+ */
+export function isUnboxedWaitingOnConfirmation(
+  r: OpsRecord,
+  range?: DateRange,
+  now?: Date,
+): boolean {
+  if (!isUnboxedRecord(r)) return false;
+  const hasRange = Boolean(
+    range &&
+    typeof range === "object" &&
+    range.from instanceof Date &&
+    range.to instanceof Date
+  );
+  if (hasRange && !isMonthlyReceived(r, range, now)) return false;
+  const orderNo = getRecordCol(r, "Order Number") ?? getRecordCol(r, "Order no.") ?? r.id;
+  if (!orderNo && !getRecordCol(r, "SKU")) return false;
+
+  const avail = (
+    getRecordCol(r, "Availability ") ??
+    getRecordCol(r, "Availability") ??
+    ""
+  ).trim();
+  return !avail || avail.toLowerCase() === "(blank)";
+}
+
+/**
+ * Unboxed Filter 2: Waiting on Process
+ * Criteria: In "Unboxed v2" sheet; "Availability " column has value "Yes" AND "Status" column is not equal to "Processed" AND "Status" column should not contain value "Cancelled ".
+ * Respects active selected date range filter.
+ */
+export function isUnboxedWaitingOnProcess(
+  r: OpsRecord,
+  range?: DateRange,
+  now?: Date,
+): boolean {
+  if (!isUnboxedRecord(r)) return false;
+  const hasRange = Boolean(
+    range &&
+    typeof range === "object" &&
+    range.from instanceof Date &&
+    range.to instanceof Date
+  );
+  if (hasRange && !isMonthlyReceived(r, range, now)) return false;
+  const orderNo = getRecordCol(r, "Order Number") ?? getRecordCol(r, "Order no.") ?? r.id;
+  if (!orderNo && !getRecordCol(r, "SKU")) return false;
+
+  const avail = (
+    getRecordCol(r, "Availability ") ??
+    getRecordCol(r, "Availability") ??
+    ""
+  ).trim().toLowerCase();
+  if (avail !== "yes") return false;
+
+  const status = (
+    getRecordCol(r, "Status") ??
+    getRecordStatus(r) ??
+    ""
+  ).trim().toLowerCase();
+
+  const isProcessed = status === "processed";
+  const isCancelled = status.includes("cancel");
+
+  return !isProcessed && !isCancelled;
+}
+
+/** Extracts the Confirmation Due Date for Unboxed records. */
+export function getUnboxedConfirmationDueDate(r: OpsRecord): Date | null {
+  const rawDate =
+    getRecordCol(r, "Confirmation Due Date") ??
+    getRecordCol(r, "Confirmation Due Date ") ??
+    getRecordCol(r, "Due Date");
+  if (!rawDate || rawDate.trim() === "" || rawDate.trim() === "(blank)") return null;
+  const trimmed = rawDate.trim();
+  if (/^\d{4,6}(\.\d+)?$/.test(trimmed)) {
+    const iso = serialToIso(Number(trimmed));
+    if (iso) return new Date(iso);
+  }
+  const iso =
+    parseSheetDate(trimmed, "ISO") ??
+    parseSheetDate(trimmed, "DMY") ??
+    parseSheetDate(trimmed, "MDY");
+  if (iso) {
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  const direct = new Date(trimmed);
+  return Number.isNaN(direct.getTime()) ? null : direct;
+}
+
 /** Extracts and normalizes the order date from record createdAt or raw columns. */
 export function getRecordOrderDate(r: OpsRecord): Date | null {
   // If record belongs to Above 50k Orders, strictly apply date filter on "Order Date" column:
@@ -365,6 +488,7 @@ export function getRecordOrderDate(r: OpsRecord): Date | null {
 /** Extracts the numeric order amount (e.g. from Amt or Amount). */
 export function getRecordAmount(r: OpsRecord): number | null {
   const rawAmt =
+    getRecordCol(r, "Total Order Value") ??
     getRecordCol(r, "Amt") ??
     getRecordCol(r, "Amount") ??
     getRecordCol(r, "Order Amount") ??
@@ -384,15 +508,24 @@ export function getRecordAmount(r: OpsRecord): number | null {
 export function isMonthlyReceived(r: OpsRecord, range?: DateRange, now: Date = new Date()): boolean {
   const d = getRecordOrderDate(r);
   if (!d) return false;
-  if (range) {
+  if (
+    range &&
+    typeof range === "object" &&
+    range.from instanceof Date &&
+    !Number.isNaN(range.from.getTime()) &&
+    range.to instanceof Date &&
+    !Number.isNaN(range.to.getTime())
+  ) {
     const t = d.getTime();
     return t >= range.from.getTime() && t < range.to.getTime();
   }
-  return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+  const refDate = now instanceof Date && !Number.isNaN(now.getTime()) ? now : new Date();
+  return d.getUTCFullYear() === refDate.getUTCFullYear() && d.getUTCMonth() === refDate.getUTCMonth();
 }
 
 const within = (iso: string | null, range: DateRange) => {
   const t = ms(iso);
+  if (!range || !range.from || !range.to) return false;
   return !Number.isNaN(t) && t >= range.from.getTime() && t < range.to.getTime();
 };
 
@@ -423,6 +556,8 @@ export type KpiKey =
   | "kanto_waiting_assembly"
   | "kanto_waiting_process"
   | "kanto_dispatched"
+  | "unboxed_waiting_confirmation"
+  | "unboxed_waiting_process"
   | "open"
   | "created"
   | "resolved"
@@ -970,6 +1105,107 @@ export function computeKantoKpis(
   });
 
   return [waitingAssembly, waitingProcess, dispatched];
+}
+
+export function computeUnboxedKpis(
+  records: OpsRecord[],
+  range: DateRange,
+  cfg: MetricsConfig,
+): Kpi[] {
+  const unboxedRecords = records.filter(isUnboxedRecord);
+  const prev = previousRange(range);
+  const starts = bucketStarts(range);
+  const step = granularityFor(range) === "day" ? DAY : 7 * DAY;
+
+  // 1. Waiting on Confirmation (Availability is blank within selected period)
+  const waitingConfOrders = unboxedRecords.filter((r) =>
+    isUnboxedWaitingOnConfirmation(r, range, cfg.now)
+  );
+  const waitingConfTotalAmt = waitingConfOrders.reduce(
+    (sum, r) => sum + (getRecordAmount(r) ?? 0),
+    0
+  );
+  const waitingConfirmation = mk(
+    {
+      key: "unboxed_waiting_confirmation",
+      label: "Waiting on Confirmation",
+      definition:
+        'In "Unboxed v2" sheet within selected period, "Availability " column is Blank.',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg
+  );
+  waitingConfirmation.available = true;
+  waitingConfirmation.value = waitingConfOrders.length;
+  waitingConfirmation.totalAmount = waitingConfTotalAmt;
+
+  const prevConfInRange = unboxedRecords.filter((r) =>
+    isUnboxedWaitingOnConfirmation(r, prev, cfg.now)
+  ).length;
+  waitingConfirmation.previous = prevConfInRange;
+  waitingConfirmation.deltaPct = pctDelta(waitingConfirmation.value, prevConfInRange);
+  waitingConfirmation.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return unboxedRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return (
+        !Number.isNaN(t) &&
+        t >= lo &&
+        t < hi &&
+        isUnboxedWaitingOnConfirmation(r)
+      );
+    }).length;
+  });
+
+  // 2. Waiting on Process (Availability is "Yes", Status is not "Processed" and does not contain "Cancelled" within selected period)
+  const waitingProcOrders = unboxedRecords.filter((r) =>
+    isUnboxedWaitingOnProcess(r, range, cfg.now)
+  );
+  const waitingProcTotalAmt = waitingProcOrders.reduce(
+    (sum, r) => sum + (getRecordAmount(r) ?? 0),
+    0
+  );
+  const waitingProcess = mk(
+    {
+      key: "unboxed_waiting_process",
+      label: "Waiting on Process",
+      definition:
+        'In "Unboxed v2" sheet within selected period, "Availability " column has value "Yes", "Status" column is not equal to "Processed", and does not contain "Cancelled".',
+      requires: [],
+      unit: "count",
+      good: "down",
+    },
+    cfg
+  );
+  waitingProcess.available = true;
+  waitingProcess.value = waitingProcOrders.length;
+  waitingProcess.totalAmount = waitingProcTotalAmt;
+
+  const prevProcInRange = unboxedRecords.filter((r) =>
+    isUnboxedWaitingOnProcess(r, prev, cfg.now)
+  ).length;
+  waitingProcess.previous = prevProcInRange;
+  waitingProcess.deltaPct = pctDelta(waitingProcess.value, prevProcInRange);
+  waitingProcess.sparkline = starts.map((s) => {
+    const lo = Math.max(s.getTime(), range.from.getTime());
+    const hi = Math.min(s.getTime() + step, range.to.getTime());
+    return unboxedRecords.filter((r) => {
+      const d = getRecordOrderDate(r);
+      const t = d ? d.getTime() : ms(r.createdAt);
+      return (
+        !Number.isNaN(t) &&
+        t >= lo &&
+        t < hi &&
+        isUnboxedWaitingOnProcess(r)
+      );
+    }).length;
+  });
+
+  return [waitingConfirmation, waitingProcess];
 }
 
 // ----------------------------------------------------------------------------- trend

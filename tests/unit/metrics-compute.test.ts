@@ -28,6 +28,11 @@ import {
   isKantoDueDateOverdue,
   isKantoDueDateWithin,
   computeKantoKpis,
+  isUnboxedRecord,
+  isUnboxedWaitingOnConfirmation,
+  isUnboxedWaitingOnProcess,
+  getUnboxedConfirmationDueDate,
+  computeUnboxedKpis,
   type MetricsConfig,
   type DateRange,
 } from "@/lib/metrics/compute";
@@ -979,6 +984,169 @@ describe("Metrics Pure Function Calculations", () => {
       expect(dispKpi).toBeDefined();
       expect(dispKpi?.value).toBe(2);
       expect(dispKpi?.totalAmount).toBe(16999 + 16999);
+    });
+  });
+
+  describe("Unboxed Products cohort metrics", () => {
+    const unboxedRecords: OpsRecord[] = [
+      {
+        row: 2,
+        subsheet: "Unboxed v2",
+        id: "1090677",
+        title: "Order 1090677",
+        status: "Processed",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: "2026-10-10T10:00:00.000Z",
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "1090677",
+          "Order Date": "46218",
+          "SKU": "Unboxed - ORIVETI - OD200",
+          "Total Order Value": "11499",
+          "Images Required(Yes/No)": "No",
+          "Confirmation Due Date": "46220",
+          "Availability": "Yes",
+          "Status": "Processed",
+        },
+      },
+      {
+        row: 3,
+        subsheet: "Unboxed v2",
+        id: "1090989",
+        title: "Order 1090989",
+        status: "Order Received",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: "2026-10-12T10:00:00.000Z",
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "1090989",
+          "Order Date": "46218",
+          "SKU": "Unboxed - Headphone Zone X ddHiFi",
+          "Total Order Value": "2203",
+          "Images Required(Yes/No)": "Yes",
+          "Confirmation Due Date": "46221",
+          "Availability": "",
+          "Status": "Order Received",
+        },
+      },
+      {
+        row: 4,
+        subsheet: "Unboxed v2",
+        id: "1091011",
+        title: "Order 1091011",
+        status: "Order Received",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: "2026-10-15T10:00:00.000Z",
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "1091011",
+          "Order Date": "46218",
+          "SKU": "Unboxed - Audio-Technica - ATH-M50x",
+          "Total Order Value": "9999",
+          "Images Required(Yes/No)": "No",
+          "Confirmation Due Date": "46222",
+          "Availability": "Yes",
+          "Status": "Order Received",
+        },
+      },
+      {
+        row: 5,
+        subsheet: "Unboxed v2",
+        id: "1091012",
+        title: "Order 1091012",
+        status: "Cancelled",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: "2026-10-16T10:00:00.000Z",
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "1091012",
+          "Order Date": "46218",
+          "SKU": "Unboxed - Sennheiser - HD 600",
+          "Total Order Value": "24999",
+          "Images Required(Yes/No)": "No",
+          "Confirmation Due Date": "46223",
+          "Availability": "Yes",
+          "Status": "Cancelled ",
+        },
+      },
+      {
+        row: 6,
+        subsheet: "Unboxed v2",
+        id: "1091013",
+        title: "Order 1091013",
+        status: "Order Received",
+        priority: null,
+        category: null,
+        team: null,
+        assignee: null,
+        createdAt: "2026-10-17T10:00:00.000Z",
+        dueAt: null,
+        resolvedAt: null,
+        raw: {
+          "Order Number": "1091013",
+          "Order Date": "46218",
+          "SKU": "Unboxed - Focal - Bathys",
+          "Total Order Value": "49999",
+          "Images Required(Yes/No)": "No",
+          "Confirmation Due Date": "46224",
+          "Availability": "No",
+          "Status": "Order Received",
+        },
+      },
+    ];
+
+    it("correctly identifies Unboxed records", () => {
+      expect(isUnboxedRecord(unboxedRecords[0])).toBe(true);
+      expect(isAbove50kRecord(unboxedRecords[0])).toBe(false);
+      expect(isVModaRecord(unboxedRecords[0])).toBe(false);
+      expect(isDemoRecord(unboxedRecords[0])).toBe(false);
+      expect(isKantoRecord(unboxedRecords[0])).toBe(false);
+    });
+
+    it("identifies Waiting on Confirmation (Availability is blank)", () => {
+      expect(isUnboxedWaitingOnConfirmation(unboxedRecords[0])).toBe(false); // Availability: Yes
+      expect(isUnboxedWaitingOnConfirmation(unboxedRecords[1])).toBe(true);  // Availability: blank
+      expect(isUnboxedWaitingOnConfirmation(unboxedRecords[2])).toBe(false); // Availability: Yes
+      expect(isUnboxedWaitingOnConfirmation(unboxedRecords[4])).toBe(false); // Availability: No (not blank)
+    });
+
+    it("identifies Waiting on Process (Availability is Yes AND Status != Processed AND Status does not contain Cancelled)", () => {
+      expect(isUnboxedWaitingOnProcess(unboxedRecords[0])).toBe(false); // Processed
+      expect(isUnboxedWaitingOnProcess(unboxedRecords[1])).toBe(false); // Availability is blank
+      expect(isUnboxedWaitingOnProcess(unboxedRecords[2])).toBe(true);  // Availability: Yes, Status: Order Received
+      expect(isUnboxedWaitingOnProcess(unboxedRecords[3])).toBe(false); // Status: Cancelled
+      expect(isUnboxedWaitingOnProcess(unboxedRecords[4])).toBe(false); // Availability is No
+    });
+
+    it("computes accurate Unboxed KPIs within selected date range", () => {
+      const kpis = computeUnboxedKpis(unboxedRecords, range, config);
+      expect(kpis.length).toBe(2);
+
+      const confKpi = kpis.find((k) => k.key === "unboxed_waiting_confirmation");
+      expect(confKpi).toBeDefined();
+      expect(confKpi?.value).toBe(1);
+      expect(confKpi?.totalAmount).toBe(2203);
+
+      const procKpi = kpis.find((k) => k.key === "unboxed_waiting_process");
+      expect(procKpi).toBeDefined();
+      expect(procKpi?.value).toBe(1);
+      expect(procKpi?.totalAmount).toBe(9999);
     });
   });
 });

@@ -108,6 +108,9 @@ export function DateRangeFilter({ currentRange, className = "" }: DateRangeFilte
     let s = from;
     let e = to;
     if (s > e) [s, e] = [e, s];
+    const today = toIsoDate(new Date());
+    if (s > today) s = today;
+    if (e > today) e = today;
     const next = new URLSearchParams(searchParams?.toString() || "");
     next.set("range", "custom");
     next.set("from", s);
@@ -128,6 +131,10 @@ export function DateRangeFilter({ currentRange, className = "" }: DateRangeFilte
   };
 
   const nextMonth = () => {
+    const now = new Date();
+    if (viewYear > now.getFullYear() || (viewYear === now.getFullYear() && viewMonth >= now.getMonth())) {
+      return;
+    }
     if (viewMonth === 11) {
       setViewMonth(0);
       setViewYear((y) => y + 1);
@@ -181,6 +188,9 @@ export function DateRangeFilter({ currentRange, className = "" }: DateRangeFilte
 
   // Handle cell click
   const handleDateClick = (dateStr: string) => {
+    const today = toIsoDate(new Date());
+    if (dateStr > today) return; // Disallow selecting future dates
+
     if (!startDate || (startDate && endDate)) {
       // Starting new selection
       setStartDate(dateStr);
@@ -191,6 +201,7 @@ export function DateRangeFilter({ currentRange, className = "" }: DateRangeFilte
       let s = startDate;
       let e = dateStr;
       if (s > e) [s, e] = [e, s];
+      if (e > today) e = today;
       setStartDate(s);
       setEndDate(e);
       setHoverDate(null);
@@ -360,14 +371,28 @@ export function DateRangeFilter({ currentRange, className = "" }: DateRangeFilte
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={nextMonth}
-                    className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
-                    aria-label="Next Month"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                  {(() => {
+                    const now = new Date();
+                    const isNextDisabled =
+                      viewYear > now.getFullYear() ||
+                      (viewYear === now.getFullYear() && viewMonth >= now.getMonth());
+                    return (
+                      <button
+                        type="button"
+                        onClick={nextMonth}
+                        disabled={isNextDisabled}
+                        className={`p-1 rounded-lg transition-colors ${
+                          isNextDisabled
+                            ? "opacity-30 cursor-not-allowed text-slate-300 dark:text-slate-600"
+                            : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                        }`}
+                        aria-label="Next Month"
+                        title={isNextDisabled ? "Future months are disabled" : "Next Month"}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -386,47 +411,55 @@ export function DateRangeFilter({ currentRange, className = "" }: DateRangeFilte
               {/* Day Cells Grid */}
               <div className="grid grid-cols-7 gap-1 text-center">
                 {allCells.map(({ day, dateStr, isCurrentMonth }, idx) => {
+                  const todayStr = toIsoDate(new Date());
+                  const isFuture = dateStr > todayStr;
                   const isStart = startDate === dateStr;
                   const isEnd = endDate === dateStr;
                   const hasBoth = Boolean(startDate && endDate);
 
                   // Range in-between highlighting
                   let inRange = false;
-                  if (hasBoth) {
-                    const min = startDate < endDate ? startDate : endDate;
-                    const max = startDate < endDate ? endDate : startDate;
-                    inRange = dateStr > min && dateStr < max;
-                  } else if (startDate && hoverDate && !endDate) {
-                    const min = startDate < hoverDate ? startDate : hoverDate;
-                    const max = startDate < hoverDate ? hoverDate : startDate;
-                    inRange = dateStr > min && dateStr < max;
+                  if (!isFuture) {
+                    if (hasBoth) {
+                      const min = startDate < endDate ? startDate : endDate;
+                      const max = startDate < endDate ? endDate : startDate;
+                      inRange = dateStr > min && dateStr < max;
+                    } else if (startDate && hoverDate && !endDate) {
+                      const min = startDate < hoverDate ? startDate : hoverDate;
+                      const max = startDate < hoverDate ? hoverDate : startDate;
+                      inRange = dateStr > min && dateStr < max;
+                    }
                   }
 
-                  const isHoverEnd = !endDate && hoverDate === dateStr;
-                  const todayStr = toIsoDate(new Date());
+                  const isHoverEnd = !isFuture && !endDate && hoverDate === dateStr;
                   const isToday = dateStr === todayStr;
 
                   return (
                     <button
                       key={`${dateStr}-${idx}`}
                       type="button"
-                      onClick={() => handleDateClick(dateStr)}
+                      disabled={isFuture}
+                      onClick={() => !isFuture && handleDateClick(dateStr)}
                       onMouseEnter={() => {
-                        if (startDate && !endDate) setHoverDate(dateStr);
+                        if (startDate && !endDate && !isFuture) setHoverDate(dateStr);
                       }}
                       className={`
                         h-7 text-xs rounded-md transition-colors relative flex items-center justify-center font-medium
                         ${
-                          !isCurrentMonth
+                          isFuture
+                            ? "opacity-25 cursor-not-allowed pointer-events-none text-slate-300 dark:text-slate-600"
+                            : !isCurrentMonth
                             ? "text-slate-300 dark:text-slate-600"
                             : "text-slate-800 dark:text-slate-200"
                         }
                         ${
-                          isStart || isEnd || isHoverEnd
+                          !isFuture && (isStart || isEnd || isHoverEnd)
                             ? "bg-[#0284C7] text-white font-bold shadow-xs hover:bg-[#0284C7]"
-                            : inRange
+                            : !isFuture && inRange
                             ? "bg-[#0284C7]/15 dark:bg-[#38BDF8]/20 text-[#0284C7] dark:text-[#38BDF8]"
-                            : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                            : !isFuture
+                            ? "hover:bg-slate-100 dark:hover:bg-slate-800"
+                            : ""
                         }
                         ${isToday && !isStart && !isEnd ? "underline underline-offset-2 decoration-[#0284C7]" : ""}
                       `}

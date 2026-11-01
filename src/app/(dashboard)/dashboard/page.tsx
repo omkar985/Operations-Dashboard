@@ -8,10 +8,12 @@ import {
   computeVModaKpis,
   computeDemoKpis,
   computeKantoKpis,
+  computeUnboxedKpis,
   isAbove50kRecord,
   isVModaRecord,
   isDemoRecord,
   isKantoRecord,
+  isUnboxedRecord,
   type MetricsConfig,
 } from "@/lib/metrics/compute";
 import type { FieldKey } from "@/types/operations";
@@ -19,6 +21,7 @@ import { Above50kSection } from "@/components/dashboard/above-50k-section";
 import { VModaSection } from "@/components/dashboard/vmoda-section";
 import { DemoSection } from "@/components/dashboard/demo-section";
 import { KantoSection } from "@/components/dashboard/kanto-section";
+import { UnboxedSection } from "@/components/dashboard/unboxed-section";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LiveRefreshHeader } from "@/components/dashboard/live-refresh-header";
@@ -110,11 +113,13 @@ export default async function DashboardPage(props: DashboardPageProps) {
   const vmodaRecords = dataset.records.filter(isVModaRecord);
   const demoRecords = dataset.records.filter(isDemoRecord);
   const kantoRecords = dataset.records.filter(isKantoRecord);
+  const unboxedRecords = dataset.records.filter(isUnboxedRecord);
 
   const above50kKpis = computeKpis(above50kRecords, parsedRange, metricsConfig);
   const vmodaKpis = computeVModaKpis(dataset.records, parsedRange, metricsConfig);
   const demoKpis = computeDemoKpis(dataset.records, parsedRange, metricsConfig);
   const kantoKpis = computeKantoKpis(dataset.records, parsedRange, metricsConfig);
+  const unboxedKpis = computeUnboxedKpis(dataset.records, parsedRange, metricsConfig);
 
   const exportUrl = `/api/operations/export?range=${encodeURIComponent(
     parsedRange.key
@@ -175,6 +180,9 @@ export default async function DashboardPage(props: DashboardPageProps) {
 
       {/* Kanto Products Section with Glassmorphic Cards & Drill-down Modal */}
       <KantoSection records={kantoRecords} kpis={kantoKpis} range={parsedRange} />
+
+      {/* Unboxed Products Section with Glassmorphic Cards & Drill-down Modal */}
+      <UnboxedSection records={unboxedRecords} kpis={unboxedKpis} range={parsedRange} />
     </div>
   );
 }

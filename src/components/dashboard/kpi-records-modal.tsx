@@ -46,6 +46,10 @@ import {
   isKantoWaitingOnAssembly,
   isKantoWaitingOnProcess,
   isKantoDispatched,
+  isUnboxedRecord,
+  isUnboxedWaitingOnConfirmation,
+  isUnboxedWaitingOnProcess,
+  getUnboxedConfirmationDueDate,
   getKantoStatus,
   getKantoAssemblingDueDate,
   isKantoDueDateOverdue,
@@ -193,6 +197,12 @@ export function KpiRecordsModal({
     if (kpiKey === "kanto_dispatched") {
       return records.filter(isKantoDispatched);
     }
+    if (kpiKey === "unboxed_waiting_confirmation") {
+      return records.filter((r) => isUnboxedWaitingOnConfirmation(r, range));
+    }
+    if (kpiKey === "unboxed_waiting_process") {
+      return records.filter((r) => isUnboxedWaitingOnProcess(r, range));
+    }
     return records;
   }, [kpiKey, records, range]);
 
@@ -209,6 +219,11 @@ export function KpiRecordsModal({
   const isKantoCohort = useMemo(() => {
     if (kpiKey?.startsWith("kanto_")) return true;
     return cohortRecords.length > 0 && cohortRecords.every(isKantoRecord);
+  }, [kpiKey, cohortRecords]);
+
+  const isUnboxedCohort = useMemo(() => {
+    if (kpiKey?.startsWith("unboxed_")) return true;
+    return cohortRecords.length > 0 && cohortRecords.every(isUnboxedRecord);
   }, [kpiKey, cohortRecords]);
 
   // Search filter & sort
@@ -261,6 +276,11 @@ export function KpiRecordsModal({
           getRecordCol(r, "Assembled?") ??
           ""
         ).toLowerCase();
+        const availability = (
+          getRecordCol(r, "Availability ") ??
+          getRecordCol(r, "Availability") ??
+          ""
+        ).toLowerCase();
         const action = (
           getRecordCol(r, "AWB ") ??
           getRecordCol(r, "AWB") ??
@@ -274,6 +294,7 @@ export function KpiRecordsModal({
           customer.includes(q) ||
           status.includes(q) ||
           assembled.includes(q) ||
+          availability.includes(q) ||
           action.includes(q)
         );
       });
@@ -446,6 +467,76 @@ export function KpiRecordsModal({
       const link = document.createElement("a");
       link.href = url;
       link.download = `${kpiTitle.toLowerCase().replace(/\s+/g, "-")}-kanto-orders.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (isUnboxedCohort) {
+      const headers = [
+        "Order Number",
+        "Order Date",
+        "Amount (INR)",
+        "SKU",
+        "Availability",
+        "Status",
+        "Images Required",
+        "Confirmation Due Date",
+        "Other Color/Variant Availability",
+        "Image Drive Link",
+        "Shopify Admin URL",
+      ];
+
+      const rows = filteredRecords.map((r) => {
+        const rawOrderNo =
+          getRecordCol(r, "Order Number") ??
+          getRecordCol(r, "Order no.") ??
+          getRecordCol(r, "Order No") ??
+          r.id ??
+          "";
+        const cleanId = String(rawOrderNo).replace(/^#/, "").trim();
+        const orderDate = formatDateDisplay(getRecordOrderDate(r));
+        const amt = getRecordAmount(r) ?? 0;
+        const sku = getRecordCol(r, "SKU") ?? "";
+        const avail =
+          getRecordCol(r, "Availability ") ??
+          getRecordCol(r, "Availability") ??
+          "";
+        const status = getRecordCol(r, "Status") ?? getRecordStatus(r) ?? "Pending";
+        const imagesReq = getRecordCol(r, "Images Required(Yes/No)") ?? "";
+        const confDueDate = getUnboxedConfirmationDueDate(r);
+        const confDueDateStr = formatDateDisplay(confDueDate);
+        const otherColor = getRecordCol(r, "Other Color/Variant Availability") ?? "";
+        const driveLink = getRecordCol(r, "Image Drive Link (Chennai)") ?? "";
+        const rawShopifyLink = (getRecordCol(r, "Shopify Order Link") ?? "").trim();
+        const shopifyUrl =
+          rawShopifyLink && rawShopifyLink.startsWith("http")
+            ? rawShopifyLink
+            : `https://admin.shopify.com/store/headphonezone/orders?query=${encodeURIComponent(
+                cleanId
+              )}`;
+
+        return [
+          `"${String(rawOrderNo).replace(/"/g, '""')}"`,
+          `"${orderDate}"`,
+          amt,
+          `"${sku.replace(/"/g, '""')}"`,
+          `"${avail.replace(/"/g, '""')}"`,
+          `"${status.replace(/"/g, '""')}"`,
+          `"${imagesReq.replace(/"/g, '""')}"`,
+          `"${confDueDateStr}"`,
+          `"${otherColor.replace(/"/g, '""')}"`,
+          `"${driveLink.replace(/"/g, '""')}"`,
+          `"${shopifyUrl}"`,
+        ].join(",");
+      });
+
+      const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${kpiTitle.toLowerCase().replace(/\s+/g, "-")}-unboxed-products.csv`;
       link.click();
       URL.revokeObjectURL(url);
       return;
@@ -1311,6 +1402,193 @@ export function KpiRecordsModal({
                               Within Due Date
                             </span>
                           )
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-500 text-[11px]">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : isUnboxedCohort ? (
+            /* Unboxed Products Table */
+            <table className="w-full text-left text-xs border-collapse min-w-[760px]">
+              <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 font-semibold uppercase tracking-wider text-[10.5px]">
+                <tr>
+                  <th className="py-2.5 px-3 sm:px-4">Order Number</th>
+                  <th className="py-2.5 px-3 sm:px-4">Order Date</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-right">Amount</th>
+                  <th className="py-2.5 px-3 sm:px-4">SKU / Product</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Availability</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Status</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Images Req</th>
+                  <th className="py-2.5 px-3 sm:px-4">Confirmation Due Date</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Drive Link</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                {filteredRecords.map((r, i) => {
+                  const rawOrderNo =
+                    getRecordCol(r, "Order Number") ??
+                    getRecordCol(r, "Order no.") ??
+                    getRecordCol(r, "Order No") ??
+                    r.id ??
+                    `Row ${r.row}`;
+                  const cleanOrderId = String(rawOrderNo).replace(/^#/, "").trim();
+                  const rawShopifyLink = (getRecordCol(r, "Shopify Order Link") ?? "").trim();
+                  const shopifyUrl =
+                    rawShopifyLink && rawShopifyLink.startsWith("http")
+                      ? rawShopifyLink
+                      : `https://admin.shopify.com/store/headphonezone/orders?query=${encodeURIComponent(
+                          cleanOrderId
+                        )}`;
+
+                  const orderDate = formatDateDisplay(getRecordOrderDate(r));
+                  const amt = getRecordAmount(r);
+                  const sku = getRecordCol(r, "SKU") ?? "—";
+                  const avail = (
+                    getRecordCol(r, "Availability ") ??
+                    getRecordCol(r, "Availability") ??
+                    ""
+                  ).trim();
+                  const lowerAvail = avail.toLowerCase();
+                  const isAvailYes = lowerAvail === "yes";
+                  const isAvailNo = lowerAvail === "no";
+
+                  const status =
+                    getRecordCol(r, "Status") ?? getRecordStatus(r) ?? "Pending";
+                  const lowerStatus = status.toLowerCase();
+
+                  const imagesReq = (
+                    getRecordCol(r, "Images Required(Yes/No)") ??
+                    getRecordCol(r, "Images Required") ??
+                    ""
+                  ).trim();
+                  const isImagesYes = imagesReq.toLowerCase() === "yes";
+
+                  const confDueDate = getUnboxedConfirmationDueDate(r);
+                  const confDueDateDisplay = formatDateDisplay(confDueDate);
+
+                  const driveLink = (
+                    getRecordCol(r, "Image Drive Link (Chennai)") ??
+                    getRecordCol(r, "Image Drive Link") ??
+                    ""
+                  ).trim();
+
+                  // Status badge styling
+                  let statusBadgeClass =
+                    "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+                  if (lowerStatus.includes("processed") || lowerStatus.includes("fulfill")) {
+                    statusBadgeClass =
+                      "bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/40";
+                  } else if (lowerStatus.includes("order received") || lowerStatus.includes("received")) {
+                    statusBadgeClass =
+                      "bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800/40";
+                  } else if (lowerStatus.includes("cancel")) {
+                    statusBadgeClass =
+                      "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/40";
+                  } else if (lowerStatus.includes("deliver") || lowerStatus.includes("dispatch")) {
+                    statusBadgeClass =
+                      "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40";
+                  }
+
+                  return (
+                    <tr
+                      key={r.id || `row-${r.row}-${i}`}
+                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                    >
+                      {/* 1. Order Number */}
+                      <td className="py-2.5 px-3 sm:px-4 font-mono font-medium whitespace-nowrap">
+                        <a
+                          href={shopifyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[#0284C7] dark:text-[#38BDF8] hover:underline font-semibold"
+                          title="Open Order in Shopify Admin"
+                        >
+                          <span>{String(rawOrderNo).startsWith("#") ? rawOrderNo : `#${rawOrderNo}`}</span>
+                          <ExternalLink className="w-3 h-3 opacity-70" />
+                        </a>
+                      </td>
+
+                      {/* 2. Order Date */}
+                      <td className="py-2.5 px-3 sm:px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {orderDate}
+                      </td>
+
+                      {/* 3. Amount */}
+                      <td className="py-2.5 px-3 sm:px-4 text-right font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                        {amt !== null ? `₹${amt.toLocaleString("en-IN")}` : "—"}
+                      </td>
+
+                      {/* 4. SKU */}
+                      <td className="py-2.5 px-3 sm:px-4 max-w-[240px]">
+                        <span className="line-clamp-2 text-slate-700 dark:text-slate-300 font-sans" title={sku}>
+                          {sku}
+                        </span>
+                      </td>
+
+                      {/* 5. Availability */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        {isAvailYes ? (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                            Yes
+                          </span>
+                        ) : isAvailNo ? (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40">
+                            No
+                          </span>
+                        ) : (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40">
+                            {avail || "Blank"}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 6. Status */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusBadgeClass} whitespace-nowrap`}
+                          title={status}
+                        >
+                          {status}
+                        </span>
+                      </td>
+
+                      {/* 7. Images Required */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        {isImagesYes ? (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40">
+                            Yes
+                          </span>
+                        ) : imagesReq ? (
+                          <span className="text-slate-500 dark:text-slate-400 text-[11px]">
+                            {imagesReq}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-500 text-[11px]">—</span>
+                        )}
+                      </td>
+
+                      {/* 8. Confirmation Due Date */}
+                      <td className="py-2.5 px-3 sm:px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {confDueDateDisplay}
+                      </td>
+
+                      {/* 9. Drive Link */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        {driveLink && driveLink.startsWith("http") ? (
+                          <a
+                            href={driveLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[#0284C7] dark:text-[#38BDF8] hover:underline font-medium text-[11px]"
+                            title="Open Google Drive Link"
+                          >
+                            <span>Drive</span>
+                            <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                          </a>
                         ) : (
                           <span className="text-slate-400 dark:text-slate-500 text-[11px]">—</span>
                         )}
